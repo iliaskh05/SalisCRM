@@ -21,6 +21,8 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   lost: "Perdu",
 };
 
+export { REQUEST_STATUS_LABELS } from "@/lib/quote-requests/status";
+
 export const CLIENT_STATUS_LABELS: Record<ClientStatus, string> = {
   active: "Actif",
   inactive: "Inactif",

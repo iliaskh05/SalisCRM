@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { useAuth } from "@/contexts/AuthContext";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ export function UnauthorizedPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center">
+        <BrandLogo size="md" align="center" className="mb-5" />
         <h1 className="text-xl font-semibold">Accès refusé</h1>
         <p className="mt-3 text-sm text-muted-foreground">
           {isAuthenticated

@@ -91,10 +91,21 @@ const COMMERCIAL_PERMISSIONS: Permission[] = [
   "documents:write",
   "activities:read",
   "finances:view",
+  "stats:view",
 ];
 
-/** Accès limité — modules prestataire non ouverts en phase 1-2. */
-const PRESTATAIRE_PERMISSIONS: Permission[] = [];
+/** Accès limité terrain — pas de finance consolidée. */
+const PRESTATAIRE_PERMISSIONS: Permission[] = [
+  "dashboard:view",
+  "interventions:read",
+  "interventions:write",
+  "photos:read",
+  "photos:write",
+  "clients:read",
+  "installations:read",
+  "documents:read",
+  "activities:read",
+];
 
 const ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
   admin: ADMIN_PERMISSIONS,

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Upload } from "lucide-react";
+import { ArrowLeft, Upload, ClipboardCheck } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -166,7 +166,15 @@ export function InterventionDetailPage() {
             </Link>
           </>
         }
-        actions={<InterventionStatusBadge status={intervention!.status} />}
+        actions={
+          <div className="flex gap-2">
+            <InterventionStatusBadge status={intervention!.status} />
+            <Button size="sm" variant="outline" onClick={() => navigate(`/interventions/${id}/report`)}>
+              <ClipboardCheck className="size-3.5" />
+              Rapport
+            </Button>
+          </div>
+        }
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -385,7 +393,7 @@ function PhotosSection({
             </div>
             <div>
               <Label>Fichier</Label>
-              <Input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+              <Input type="file" accept="image/*" capture="environment" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
             </div>
             <div className="sm:col-span-2">
               <Label>Commentaire</Label>

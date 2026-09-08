@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { loginSchema } from "@/lib/validations";
+import { supabase } from "@/lib/supabase/client";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,11 +45,9 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_top,_oklch(0.94_0.02_205),_var(--background)_55%)] px-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-[0_20px_50px_-28px_oklch(0.2_0.03_250/0.45)]">
         <div className="mb-8">
-          <p className="text-xs font-semibold tracking-[0.18em] text-accent uppercase">
-            Salis 3 Hottes
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink">SalisCRM</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <BrandLogo size="xl" align="center" />
+          <h1 className="mt-5 text-center text-xl font-semibold tracking-tight text-ink">SalisCRM</h1>
+          <p className="mt-1 text-center text-sm text-muted-foreground">
             Espace interne — direction & équipe commerciale
           </p>
         </div>
@@ -80,6 +80,24 @@ export function LoginPage() {
             {submitting ? "Connexion…" : "Se connecter"}
           </Button>
         </form>
+        <div className="mt-5 flex flex-col gap-2 text-sm">
+          <button
+            type="button"
+            className="text-left text-xs text-muted-foreground hover:underline"
+            onClick={async () => {
+              if (!email) {
+                toast.error("Saisissez votre email");
+                return;
+              }
+              const { error } = await supabase.auth.resetPasswordForEmail(email);
+              if (error) toast.error(error.message);
+              else toast.success("Si le compte existe, un e-mail de réinitialisation a été préparé (prêt à connecter).");
+            }}
+          >
+            Mot de passe oublié
+          </button>
+          <Link to="/register" className="text-teal-700">Demander un accès</Link>
+        </div>
       </div>
     </div>
   );

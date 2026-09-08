@@ -18,6 +18,7 @@ import { RoleGate } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase/client";
 import { logActivity } from "@/lib/activities";
+import { isWebsiteQuoteRequest } from "@/lib/quote-requests/source";
 import {
   ACTIVITY_TYPE_LABELS,
   LEAD_PRIORITIES,
@@ -282,6 +283,11 @@ export function LeadDetailPage() {
             <Row label="Ville" value={[lead.postal_code, lead.city].filter(Boolean).join(" ")} />
             <Row label="Type" value={lead.business_type} />
             <Row label="Source" value={lead.source} />
+            {isWebsiteQuoteRequest(lead) ? (
+              <Link to={`/demandes-devis/${lead.id}`} className="text-sm text-teal-700">
+                Ouvrir dans Demandes de devis
+              </Link>
+            ) : null}
             <Row label="Message" value={lead.message} />
           </CardContent>
         </Card>

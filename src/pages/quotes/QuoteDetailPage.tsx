@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Receipt } from "lucide-react";
+import { ArrowLeft, FileDown, Printer, Receipt, Send, Wrench } from "lucide-react";
+import { QuotePreview, printElement } from "@/components/quotes/QuotePreview";
+import { SendQuoteDialog } from "@/components/quotes/SendQuoteDialog";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -12,13 +14,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingState } from "@/components/ui/loading-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { QuoteStatusBadge } from "@/components/ui/status-badge";
-import { TableShell, Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { RoleGate } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase/client";
 import { logActivity } from "@/lib/activities";
+import { COMPANY } from "@/lib/company";
+import { calculateQuote } from "@/lib/quotes/calculate";
 import { QUOTE_STATUS_LABELS } from "@/lib/constants";
-import { formatCurrency, formatDate, nullIfEmpty, todayISO } from "@/lib/format";
+import { formatDate, nullIfEmpty, todayISO } from "@/lib/format";
 import type { QuoteStatus, Tables } from "@/lib/supabase/types";
 
 async function fetchQuote(id: string) {
@@ -27,7 +30,7 @@ async function fetchQuote(id: string) {
   const quote = data as Tables<"quotes">;
   const [{ data: items }, { data: client }] = await Promise.all([
     supabase.from("quote_items").select("*").eq("quote_id", id).order("position"),
-    supabase.from("clients").select("id, company_name").eq("id", quote.client_id).maybeSingle(),
+    supabase.from("clients").select("id, company_name, contact_name, phone, email, address, postal_code, city, siret").eq("id", quote.client_id).maybeSingle(),
   ]);
   return {
     quote,
@@ -51,6 +54,7 @@ export function QuoteDetailPage() {
   const quote = query.data?.quote;
   const [status, setStatus] = useState<QuoteStatus>("draft");
   const [notes, setNotes] = useState("");
+  const [sendOpen, setSendOpen] = useState(false);
 
   useEffect(() => {
     if (!quote) return;
@@ -162,16 +166,61 @@ export function QuoteDetailPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const createIntervention = useMutation({
+    mutationFn: async () => {
+      if (!quote || !query.data) throw new Error("Devis introuvable");
+      const { data, error } = await supabase
+        .from("interventions")
+        .insert({
+          client_id: quote.client_id,
+          status: "to_plan",
+          service_type: query.data.items[0]?.label ?? "Intervention",
+          description: query.data.items.map((i) => i.label).join(" · "),
+          price_ht: quote.subtotal_ht,
+          notes: quote.notes ? `${quote.notes}\n\nCréée depuis ${quote.reference ?? "devis"}` : `Créée depuis ${quote.reference ?? "devis"}`,
+          created_by: user?.id ?? null,
+        } as never)
+        .select("id")
+        .single();
+      if (error) throw error;
+      if (quote.status !== "accepted") {
+        await supabase.from("quotes").update({ status: "accepted", updated_at: new Date().toISOString() } as never).eq("id", quote.id);
+      }
+      await logActivity({
+        activity_type: "INTERVENTION_CREATED",
+        title: "Intervention créée depuis devis",
+        client_id: quote.client_id,
+        created_by: user?.id,
+        metadata: { intervention_id: data.id, quote_id: quote.id },
+      });
+      return data.id as string;
+    },
+    onSuccess: async (interventionId) => {
+      toast.success("Intervention créée — données du devis reprises");
+      await qc.invalidateQueries({ queryKey: ["interventions"] });
+      navigate(`/interventions/${interventionId}`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   if (query.isLoading) return <LoadingState />;
   if (query.error || !query.data) {
     return <EmptyState title="Devis introuvable" description={String(query.error ?? "")} />;
   }
 
   const { items, client } = query.data;
+  const totals = calculateQuote(
+    items.map((i) => ({
+      label: i.label,
+      quantity: Number(i.quantity),
+      unitPriceHt: Number(i.unit_price_ht),
+      vatRate: Number(i.vat_rate),
+    })),
+  );
 
   return (
     <div>
-      <Button variant="ghost" size="sm" className="mb-3" onClick={() => navigate("/devis")}>
+      <Button variant="ghost" size="sm" className="no-print mb-3" onClick={() => navigate("/devis")}>
         <ArrowLeft className="size-4" />
         Retour
       </Button>
@@ -189,18 +238,40 @@ export function QuoteDetailPage() {
           </>
         }
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="no-print flex flex-wrap gap-2">
             <QuoteStatusBadge status={quote!.status} />
+            <RoleGate permission="quotes:write">
+              {quote!.status === "draft" || quote!.status === "sent" ? (
+                <Button size="sm" variant="accent" onClick={() => setSendOpen(true)}>
+                  <Send className="size-3.5" />
+                  Envoyer le devis
+                </Button>
+              ) : null}
+            </RoleGate>
+            <Button size="sm" variant="outline" onClick={() => printElement(quote!.reference ?? "devis")}>
+              <Printer className="size-3.5" />Imprimer
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                printElement(quote!.reference ?? "devis");
+                toast.message("PDF", { description: "Choisissez « Enregistrer au format PDF » dans la boîte d’impression." });
+              }}
+            >
+              <FileDown className="size-3.5" />PDF
+            </Button>
+            <RoleGate permission="interventions:write">
+              {quote!.status === "accepted" ? (
+                <Button size="sm" variant="accent" disabled={createIntervention.isPending} onClick={() => createIntervention.mutate()}>
+                  <Wrench className="size-3.5" />Créer l’intervention
+                </Button>
+              ) : null}
+            </RoleGate>
             <RoleGate permission="invoices:write">
               {(quote!.status === "accepted" || quote!.status === "sent") && (
-                <Button
-                  variant="accent"
-                  size="sm"
-                  disabled={createInvoice.isPending}
-                  onClick={() => createInvoice.mutate()}
-                >
-                  <Receipt className="size-3.5" />
-                  Créer facture
+                <Button variant="outline" size="sm" disabled={createInvoice.isPending} onClick={() => createInvoice.mutate()}>
+                  <Receipt className="size-3.5" />Créer facture
                 </Button>
               )}
             </RoleGate>
@@ -208,68 +279,55 @@ export function QuoteDetailPage() {
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Lignes</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <TableShell className="rounded-none border-0">
-              <Table className="min-w-0">
-                <THead>
-                  <TR>
-                    <TH>Libellé</TH>
-                    <TH>Qté</TH>
-                    <TH>PU HT</TH>
-                    <TH>TVA</TH>
-                  </TR>
-                </THead>
-                <TBody>
-                  {items.map((item) => (
-                    <TR key={item.id}>
-                      <TD>
-                        <div className="font-medium">{item.label}</div>
-                        {item.description ? (
-                          <div className="text-xs text-muted-foreground">{item.description}</div>
-                        ) : null}
-                      </TD>
-                      <TD>{item.quantity}</TD>
-                      <TD>{formatCurrency(item.unit_price_ht)}</TD>
-                      <TD>{item.vat_rate}%</TD>
-                    </TR>
-                  ))}
-                </TBody>
-              </Table>
-            </TableShell>
-          </CardContent>
-        </Card>
+      {quote!.status === "accepted" ? (
+        <div className="no-print mb-4 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
+          Devis accepté. Créez l’intervention pour enchaîner sur le planning, les photos et le rapport.
+        </div>
+      ) : null}
 
-        <Card>
+      <div className="grid gap-4 lg:grid-cols-[1.4fr_.8fr]">
+        <div className="print-area">
+          <QuotePreview
+            model={{
+              reference: quote!.reference ?? quote!.id.slice(0, 8),
+              issuedAt: quote!.issued_at ?? todayISO(),
+              validUntil: quote!.valid_until,
+              notes: quote!.notes ?? undefined,
+              paymentTerms: COMPANY.paymentTermsDefault,
+              client: {
+                name: client?.company_name ?? "—",
+                contact: client?.contact_name ?? undefined,
+                address: client?.address ?? undefined,
+                postalCode: client?.postal_code ?? undefined,
+                city: client?.city ?? undefined,
+                siret: client?.siret ?? undefined,
+                email: client?.email ?? undefined,
+                phone: client?.phone ?? undefined,
+              },
+              lines: items.map((item, i) => ({
+                label: item.label,
+                description: item.description ?? undefined,
+                quantity: Number(item.quantity),
+                unitPriceHt: Number(item.unit_price_ht),
+                vatRate: Number(item.vat_rate),
+                lineTotalHt: totals.lines[i]?.lineTotalHt ?? 0,
+              })),
+              totals,
+            }}
+          />
+        </div>
+
+        <Card className="no-print">
           <CardHeader>
-            <CardTitle>Totaux & statut</CardTitle>
+            <CardTitle>Statut</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">HT</span>
-              <span>{formatCurrency(quote!.subtotal_ht)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">TVA</span>
-              <span>{formatCurrency(quote!.vat_amount)}</span>
-            </div>
-            <div className="flex justify-between font-semibold">
-              <span>TTC</span>
-              <span>{formatCurrency(quote!.total_ttc)}</span>
-            </div>
-
             <RoleGate permission="quotes:write">
-              <div className="space-y-2 border-t border-border pt-3">
+              <div className="space-y-2">
                 <Label>Statut</Label>
                 <Select value={status} onChange={(e) => setStatus(e.target.value as QuoteStatus)}>
                   {(Object.keys(QUOTE_STATUS_LABELS) as QuoteStatus[]).map((s) => (
-                    <option key={s} value={s}>
-                      {QUOTE_STATUS_LABELS[s]}
-                    </option>
+                    <option key={s} value={s}>{QUOTE_STATUS_LABELS[s]}</option>
                   ))}
                 </Select>
                 <Label>Notes</Label>
@@ -279,9 +337,42 @@ export function QuoteDetailPage() {
                 </Button>
               </div>
             </RoleGate>
+            <p className="text-xs text-muted-foreground">Envoi e-mail : prêt à connecter — aucune transmission réelle.</p>
           </CardContent>
         </Card>
       </div>
+      <SendQuoteDialog
+        open={sendOpen}
+        onClose={() => setSendOpen(false)}
+        to={client?.email ?? ""}
+        clientName={client?.company_name ?? "Client"}
+        reference={quote!.reference ?? quote!.id.slice(0, 8)}
+        validUntil={quote!.valid_until}
+        onConfirm={async () => {
+          const { error } = await supabase
+            .from("quotes")
+            .update({ status: "sent", updated_at: new Date().toISOString() } as never)
+            .eq("id", quote!.id);
+          if (error) throw error;
+          if (quote!.lead_id) {
+            await supabase
+              .from("leads")
+              .update({ status: "quote_sent", updated_at: new Date().toISOString() } as never)
+              .eq("id", quote!.lead_id);
+          }
+          await logActivity({
+            activity_type: "QUOTE_SENT",
+            title: "Devis préparé pour envoi",
+            client_id: quote!.client_id,
+            lead_id: quote!.lead_id,
+            created_by: user?.id,
+            metadata: { quote_id: quote!.id, delivery: "prepared" },
+          });
+          await qc.invalidateQueries({ queryKey: ["quote", id] });
+          await qc.invalidateQueries({ queryKey: ["quotes"] });
+          await qc.invalidateQueries({ queryKey: ["quote-requests"] });
+        }}
+      />
     </div>
   );
 }

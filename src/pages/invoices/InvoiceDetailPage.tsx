@@ -95,6 +95,10 @@ export function InvoiceDetailPage() {
         }
       />
 
+      <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        Facturation électronique 2026 : PDF lisible + couche structurée (Factur-X / UBL / CII) <b>prête pour transmission</b>. Aucune PDP n’est connectée — aucune transmission n’est prétendue réussie.
+      </div>
+
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
         <Card>
           <CardContent className="p-4">

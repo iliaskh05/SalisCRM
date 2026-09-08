@@ -18,6 +18,8 @@ import { InvoiceStatusBadge, QuoteStatusBadge, InterventionStatusBadge } from "@
 import { supabase } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, todayISO, startOfMonthISO, endOfMonthISO } from "@/lib/format";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/constants";
+import { aggregateCommercialStats } from "@/lib/quotes/commercial-stats";
+import { CommercialPerformance } from "@/components/dashboard/CommercialPerformance";
 import type { Tables } from "@/lib/supabase/types";
 
 type Kpi = { label: string; value: string; icon: typeof Users; to?: string };
@@ -39,6 +41,8 @@ async function fetchDashboard() {
     actionsClientsRes,
     quotesRelanceRes,
     activitiesRes,
+    quotesAllRes,
+    staffRes,
   ] = await Promise.all([
     supabase.from("clients").select("id", { count: "exact", head: true }).eq("status", "active"),
     supabase.from("leads").select("id", { count: "exact", head: true }).eq("status", "new"),
@@ -94,6 +98,8 @@ async function fetchDashboard() {
       .select("id, activity_type, title, description, created_at, client_id, lead_id")
       .order("created_at", { ascending: false })
       .limit(12),
+    supabase.from("quotes").select("id, status, total_ttc, created_by"),
+    supabase.from("staff_profiles").select("user_id, display_name, role").in("role", ["admin", "commercial"]),
   ]);
 
   const clientIds = [
@@ -121,6 +127,25 @@ async function fetchDashboard() {
   const collected = balances.reduce((s, b) => s + Number(b.amount_paid ?? 0), 0);
   const due = balances.reduce((s, b) => s + Number(b.amount_due ?? 0), 0);
   const overdueCount = balances.filter((b) => b.status === "overdue").length;
+  const quotesAll = quotesAllRes.data ?? [];
+  const closedQuotes = quotesAll.filter((q) => q.status === "accepted");
+  const staffPeople = (staffRes.data ?? []).map((s) => ({
+    id: s.user_id,
+    name: s.display_name?.trim() || "Commercial",
+    role: s.role,
+  }));
+  const commercials = staffPeople.filter((s) => s.role === "commercial");
+  const commercialRows = aggregateCommercialStats(
+    (commercials.length > 0 ? commercials : staffPeople.filter((s) => s.role !== "prestataire")).map((s) => ({
+      id: s.id,
+      name: s.name,
+    })),
+    quotesAll.map((q) => ({
+      commercialId: q.created_by,
+      status: q.status,
+      amountTtc: Number(q.total_ttc ?? 0),
+    })),
+  );
 
   return {
     kpis: {
@@ -133,7 +158,9 @@ async function fetchDashboard() {
       due,
       upcomingInterventions: interventionsUpcomingRes.data?.length ?? 0,
       overdueInvoices: overdueCount,
+      closedDeals: closedQuotes.length,
     },
+    commercialRows,
     interventions: interventionsUpcomingRes.data ?? [],
     unpaid: unpaidRes.data ?? [],
     actionsLeads: actionsLeadsRes.data ?? [],
@@ -153,6 +180,8 @@ async function fetchDashboard() {
       actionsClientsRes.error,
       quotesRelanceRes.error,
       activitiesRes.error,
+      quotesAllRes.error,
+      staffRes.error,
     ]
       .filter(Boolean)
       .map((e) => e!.message),
@@ -190,7 +219,7 @@ export function DashboardPage() {
   const k = data.kpis;
   const kpiItems: Kpi[] = [
     { label: "Clients actifs", value: String(k.activeClients), icon: Building2, to: "/clients" },
-    { label: "Nouveaux prospects", value: String(k.newLeads), icon: Users, to: "/prospects?status=new" },
+    { label: "Nouvelles demandes", value: String(k.newLeads), icon: Users, to: "/demandes-devis" },
     { label: "Devis en cours", value: String(k.quotesPending), icon: FileText, to: "/devis" },
     { label: "CA du mois", value: formatCurrency(k.monthCa), icon: TrendingUp, to: "/paiements" },
     { label: "Facturé", value: formatCurrency(k.invoiced), icon: Receipt, to: "/factures" },
@@ -202,6 +231,7 @@ export function DashboardPage() {
       icon: CalendarClock,
       to: "/interventions",
     },
+    { label: "Affaires abouties", value: String(k.closedDeals), icon: TrendingUp, to: "/devis" },
   ];
 
   const todayActions = [
@@ -240,6 +270,10 @@ export function DashboardPage() {
         {kpiItems.map((item) => (
           <KpiCard key={item.label} item={item} />
         ))}
+      </div>
+
+      <div className="mt-6">
+        <CommercialPerformance rows={data.commercialRows} />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">

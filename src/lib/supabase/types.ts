@@ -107,6 +107,9 @@ export type Database = {
           next_action: string | null;
           next_action_date: string | null;
           converted_client_id: string | null;
+          address: string | null;
+          filter_type: string | null;
+          motor_type: string | null;
         };
         Insert: Record<string, unknown>;
         Update: Record<string, unknown>;
@@ -267,6 +270,7 @@ export type Database = {
           reference: string | null;
           client_id: string;
           lead_id: string | null;
+          installation_id: string | null;
           status: QuoteStatus;
           issued_at: string | null;
           valid_until: string | null;

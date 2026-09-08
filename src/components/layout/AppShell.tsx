@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, Link } from "react-router-dom";
 import {
+  Inbox,
   LayoutDashboard,
+  Trophy,
   Users,
   Building2,
   Wrench,
@@ -13,11 +15,17 @@ import {
   Menu,
   Shield,
   X,
+  CalendarDays,
+  MessageSquare,
+  Package,
+  Settings,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { RoleGate } from "@/components/auth/ProtectedRoute";
 import { ROLE_LABELS, type Permission } from "@/lib/auth/permissions";
 import { Button } from "@/components/ui/button";
+import { useLeadsInboxRealtime } from "@/hooks/useLeadsInboxRealtime";
 import { cn } from "@/lib/utils";
 
 type NavItem = {
@@ -30,13 +38,19 @@ type NavItem = {
 
 const NAV: NavItem[] = [
   { to: "/", label: "Tableau de bord", icon: LayoutDashboard, end: true, permission: "dashboard:view" },
+  { to: "/demandes-devis", label: "Demandes de devis", icon: Inbox, permission: "leads:read" },
+  { to: "/commerciaux", label: "Commerciaux", icon: Trophy, permission: "stats:view" },
   { to: "/prospects", label: "Prospects", icon: Users, permission: "leads:read" },
   { to: "/clients", label: "Clients", icon: Building2, permission: "clients:read" },
-  { to: "/interventions", label: "Interventions", icon: Wrench, permission: "interventions:read" },
   { to: "/devis", label: "Devis", icon: FileText, permission: "quotes:read" },
+  { to: "/agenda", label: "Agenda", icon: CalendarDays, permission: "interventions:read" },
+  { to: "/interventions", label: "Interventions", icon: Wrench, permission: "interventions:read" },
+  { to: "/prestataires", label: "Prestataires", icon: HardHat, permission: "providers:read" },
+  { to: "/produits", label: "Produits", icon: Package, permission: "quotes:read" },
   { to: "/factures", label: "Factures", icon: Receipt, permission: "invoices:read" },
   { to: "/paiements", label: "Paiements", icon: Banknote, permission: "payments:read" },
-  { to: "/prestataires", label: "Prestataires", icon: HardHat, permission: "providers:read" },
+  { to: "/chat", label: "Messages", icon: MessageSquare, permission: "dashboard:view" },
+  { to: "/settings", label: "Paramètres", icon: Settings, permission: "users:manage" },
 ];
 
 function NavItems({ onNavigate }: { onNavigate?: () => void }) {
@@ -90,15 +104,16 @@ function SidebarFooter() {
 
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  useLeadsInboxRealtime();
 
   return (
     <div className="flex min-h-screen bg-background">
       <aside className="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex md:flex-col">
         <div className="border-b border-sidebar-border px-5 py-5">
-          <p className="text-[10px] font-semibold tracking-[0.2em] text-[oklch(0.74_0.1_198)] uppercase">
-            Salis 3 Hottes
-          </p>
-          <p className="mt-1 text-lg font-semibold">SalisCRM</p>
+          <Link to="/" className="group block">
+            <BrandLogo tone="dark" size="lg" className="group-hover:opacity-85" />
+            <p className="mt-2.5 text-[11px] font-medium tracking-[0.16em] text-white/45 uppercase">SalisCRM</p>
+          </Link>
         </div>
         <NavItems />
         <SidebarFooter />
@@ -114,12 +129,9 @@ export function AppShell() {
           />
           <aside className="relative z-10 flex h-full w-72 flex-col bg-sidebar text-sidebar-foreground shadow-xl">
             <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-4">
-              <div>
-                <p className="text-[10px] font-semibold tracking-[0.2em] text-[oklch(0.74_0.1_198)] uppercase">
-                  Salis 3 Hottes
-                </p>
-                <p className="text-lg font-semibold">SalisCRM</p>
-              </div>
+              <Link to="/" onClick={() => setMobileOpen(false)}>
+                <BrandLogo tone="dark" variant="mark" size="md" />
+              </Link>
               <Button
                 variant="ghost"
                 size="sm"
@@ -148,7 +160,10 @@ export function AppShell() {
             >
               <Menu className="size-4" />
             </Button>
-            <p className="text-sm text-muted-foreground">CRM interne — nettoyage de hottes</p>
+            <Link to="/" className="md:hidden">
+              <BrandLogo variant="mark" size="sm" />
+            </Link>
+            <p className="hidden text-sm text-muted-foreground md:block">CRM interne — nettoyage de hottes</p>
           </div>
         </header>
         <main className="flex-1 p-4 md:p-6">

@@ -1,3 +1,4 @@
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { getSupabaseConfigStatus } from "@/lib/supabase/client";
 
 /** Affiché si .env incomplet — évite un crash opaque au démarrage. */
@@ -7,6 +8,7 @@ export function SetupPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-8 shadow-sm">
+        <BrandLogo size="lg" align="center" className="mb-4" />
         <p className="text-xs font-semibold tracking-[0.18em] text-accent uppercase">SalisCRM</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">Configuration requise</h1>
         <p className="mt-3 text-sm text-muted-foreground">

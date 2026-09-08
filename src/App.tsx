@@ -7,10 +7,16 @@ import { AppShell } from "@/components/layout/AppShell";
 import { getSupabaseConfigStatus } from "@/lib/supabase/client";
 import { SetupPage } from "@/pages/SetupPage";
 import { LoginPage } from "@/pages/LoginPage";
+import { RegisterPage } from "@/pages/RegisterPage";
 import { UnauthorizedPage } from "@/pages/UnauthorizedPage";
+import { CommercialsPage } from "@/pages/commercials/CommercialsPage";
 import { DashboardPage } from "@/pages/DashboardPage";
+import { AgendaPage } from "@/pages/AgendaPage";
+import { CatalogPage, ChatPlaceholderPage, InterventionReportPage, SettingsPage } from "@/pages/ops/ExtraPages";
 import { LeadsPage } from "@/pages/leads/LeadsPage";
 import { LeadDetailPage } from "@/pages/leads/LeadDetailPage";
+import { QuoteRequestsPage } from "@/pages/quote-requests/QuoteRequestsPage";
+import { QuoteRequestDetailPage } from "@/pages/quote-requests/QuoteRequestDetailPage";
 import { ClientsPage } from "@/pages/clients/ClientsPage";
 import { ClientCreatePage } from "@/pages/clients/ClientCreatePage";
 import { ClientDetailPage } from "@/pages/clients/ClientDetailPage";
@@ -53,6 +59,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
             <Route element={<ProtectedRoute />}>
@@ -62,8 +69,14 @@ export default function App() {
                 </Route>
 
                 <Route element={<ProtectedRoute permission="leads:read" />}>
+                  <Route path="demandes-devis" element={<QuoteRequestsPage />} />
+                  <Route path="demandes-devis/:id" element={<QuoteRequestDetailPage />} />
                   <Route path="prospects" element={<LeadsPage />} />
                   <Route path="prospects/:id" element={<LeadDetailPage />} />
+                </Route>
+
+                <Route element={<ProtectedRoute permission="stats:view" />}>
+                  <Route path="commerciaux" element={<CommercialsPage />} />
                 </Route>
 
                 <Route element={<ProtectedRoute permission="clients:write" />}>
@@ -80,6 +93,8 @@ export default function App() {
                 <Route element={<ProtectedRoute permission="interventions:read" />}>
                   <Route path="interventions" element={<InterventionsPage />} />
                   <Route path="interventions/:id" element={<InterventionDetailPage />} />
+                  <Route path="interventions/:id/report" element={<InterventionReportPage />} />
+                  <Route path="agenda" element={<AgendaPage />} />
                 </Route>
 
                 <Route element={<ProtectedRoute permission="quotes:write" />}>
@@ -107,6 +122,15 @@ export default function App() {
 
                 <Route element={<ProtectedRoute permission="providers:read" />}>
                   <Route path="prestataires" element={<ProvidersPage />} />
+                </Route>
+                <Route element={<ProtectedRoute permission="quotes:read" />}>
+                  <Route path="produits" element={<CatalogPage />} />
+                </Route>
+                <Route element={<ProtectedRoute permission="dashboard:view" />}>
+                  <Route path="chat" element={<ChatPlaceholderPage />} />
+                </Route>
+                <Route element={<ProtectedRoute permission="users:manage" />}>
+                  <Route path="settings" element={<SettingsPage />} />
                 </Route>
               </Route>
             </Route>
