@@ -1,0 +1,32 @@
+# Dependencies
+node_modules
+
+# Build
+dist
+dist-ssr
+*.local
+
+# Env (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.sw?
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# Logs / cache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tsbuildinfo
+.turbo
+
+# Supabase local
+supabase/.branches
+supabase/.temp
