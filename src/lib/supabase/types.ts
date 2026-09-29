@@ -275,6 +275,10 @@ export type Database = {
           issued_at: string | null;
           valid_until: string | null;
           notes: string | null;
+          discount_ht: number;
+          deposit_amount: number;
+          payment_terms: string | null;
+          converted_intervention_id: string | null;
           subtotal_ht: number;
           vat_amount: number;
           total_ttc: number;
@@ -313,9 +317,12 @@ export type Database = {
           due_at: string | null;
           status: InvoiceStatus;
           notes: string | null;
+          discount_ht: number;
           subtotal_ht: number;
           vat_amount: number;
           total_ttc: number;
+          cancelled_at: string | null;
+          cancellation_reason: string | null;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -389,6 +396,26 @@ export type Database = {
         Update: Record<string, unknown>;
         Relationships: [];
       };
+      credit_notes: {
+        Row: {
+          id: string;
+          number: string;
+          invoice_id: string;
+          client_id: string;
+          issued_at: string;
+          reason: string;
+          subtotal_ht: number;
+          discount_ht: number;
+          vat_amount: number;
+          total_ttc: number;
+          lines: Json;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: {
       invoice_balances: {
@@ -425,6 +452,38 @@ export type Database = {
       refresh_invoice_payment_status: {
         Args: { p_invoice_id: string };
         Returns: undefined;
+      };
+      create_quote: {
+        Args: {
+          p_client_id: string;
+          p_items: Json;
+          p_lead_id?: string | null;
+          p_installation_id?: string | null;
+          p_valid_until?: string | null;
+          p_notes?: string | null;
+          p_discount_ht?: number;
+          p_deposit_amount?: number;
+          p_payment_terms?: string | null;
+        };
+        Returns: string;
+      };
+      create_invoice: {
+        Args: {
+          p_client_id: string;
+          p_items: Json;
+          p_due_at?: string | null;
+          p_notes?: string | null;
+          p_discount_ht?: number;
+        };
+        Returns: string;
+      };
+      create_invoice_from_quote: {
+        Args: { p_quote_id: string; p_due_at?: string | null };
+        Returns: string;
+      };
+      cancel_invoice: {
+        Args: { p_invoice_id: string; p_reason: string };
+        Returns: string;
       };
     };
     Enums: {

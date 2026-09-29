@@ -20,7 +20,7 @@ import { supabase } from "@/lib/supabase/client";
 import { logActivity } from "@/lib/activities";
 import { COMPANY } from "@/lib/company";
 import { calculateQuote } from "@/lib/quotes/calculate";
-import { QUOTE_STATUS_LABELS } from "@/lib/constants";
+import { QUOTE_STATUS_LABELS, QUOTE_STATUS_TRANSITIONS } from "@/lib/constants";
 import { formatDate, nullIfEmpty, todayISO } from "@/lib/format";
 import type { QuoteStatus, Tables } from "@/lib/supabase/types";
 
@@ -106,46 +106,13 @@ export function QuoteDetailPage() {
   const createInvoice = useMutation({
     mutationFn: async () => {
       if (!quote || !query.data) throw new Error("Devis introuvable");
-      const items = query.data.items;
-      if (items.length === 0) throw new Error("Aucune ligne à facturer");
-
-      const { data: invoice, error } = await supabase
-        .from("invoices")
-        .insert({
-          client_id: quote.client_id,
-          quote_id: quote.id,
-          issued_at: todayISO(),
-          due_at: null,
-          status: "unpaid",
-          notes: quote.notes,
-          subtotal_ht: 0,
-          vat_amount: 0,
-          total_ttc: 0,
-          created_by: user?.id ?? null,
-        } as never)
-        .select("id")
-        .single();
+      // Facture + lignes + passage du devis en « accepté » en une transaction.
+      // La base refuse la double facturation et les devis refusés / expirés.
+      const { data: invoiceId, error } = await supabase.rpc("create_invoice_from_quote", {
+        p_quote_id: quote.id,
+      });
       if (error) throw error;
-
-      const { error: itemsErr } = await supabase.from("invoice_items").insert(
-        items.map((item, index) => ({
-          invoice_id: invoice.id,
-          label: item.label,
-          description: item.description,
-          quantity: item.quantity,
-          unit_price_ht: item.unit_price_ht,
-          vat_rate: item.vat_rate,
-          position: index,
-        })) as never,
-      );
-      if (itemsErr) throw itemsErr;
-
-      if (quote.status !== "accepted") {
-        await supabase
-          .from("quotes")
-          .update({ status: "accepted", updated_at: new Date().toISOString() } as never)
-          .eq("id", quote.id);
-      }
+      const invoice = { id: invoiceId };
 
       await logActivity({
         activity_type: "INVOICE_CREATED",
@@ -208,7 +175,7 @@ export function QuoteDetailPage() {
     return <EmptyState title="Devis introuvable" description={String(query.error ?? "")} />;
   }
 
-  const { items, client } = query.data;
+  const { items, client, quote: loaded } = query.data;
   const totals = calculateQuote(
     items.map((i) => ({
       label: i.label,
@@ -216,6 +183,7 @@ export function QuoteDetailPage() {
       unitPriceHt: Number(i.unit_price_ht),
       vatRate: Number(i.vat_rate),
     })),
+    { discountHt: Number(loaded.discount_ht) || 0, depositAmount: Number(loaded.deposit_amount) || 0 },
   );
 
   return (
@@ -326,7 +294,7 @@ export function QuoteDetailPage() {
               <div className="space-y-2">
                 <Label>Statut</Label>
                 <Select value={status} onChange={(e) => setStatus(e.target.value as QuoteStatus)}>
-                  {(Object.keys(QUOTE_STATUS_LABELS) as QuoteStatus[]).map((s) => (
+                  {[loaded.status, ...QUOTE_STATUS_TRANSITIONS[loaded.status]].map((s) => (
                     <option key={s} value={s}>{QUOTE_STATUS_LABELS[s]}</option>
                   ))}
                 </Select>

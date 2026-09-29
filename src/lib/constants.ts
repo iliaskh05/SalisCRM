@@ -45,6 +45,15 @@ export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
   expired: "Expiré",
 };
 
+/** Miroir de trg_quotes_guard (migration invoicing_integrity) : accepté / refusé sont définitifs. */
+export const QUOTE_STATUS_TRANSITIONS: Record<QuoteStatus, QuoteStatus[]> = {
+  draft: ["sent", "accepted", "rejected"],
+  sent: ["accepted", "rejected", "expired"],
+  expired: ["sent"],
+  accepted: [],
+  rejected: [],
+};
+
 export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
   unpaid: "Impayée",
   partially_paid: "Partiellement payée",

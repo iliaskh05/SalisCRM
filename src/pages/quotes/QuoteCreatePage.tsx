@@ -197,41 +197,18 @@ export function QuoteCreatePage() {
         .filter((i) => i.label && i.quantity > 0);
       if (clean.length === 0) throw new Error("Ajoutez au moins une ligne");
 
-      const { data: quote, error } = await supabase
-        .from("quotes")
-        .insert({
-          client_id: clientId,
-          lead_id: params.get("lead"),
-          installation_id: installationId || null,
-          status: "draft",
-          issued_at: todayISO(),
-          valid_until: nullIfEmpty(validUntil),
-          notes: nullIfEmpty(notes),
-          subtotal_ht: totals.subtotalHt,
-          vat_amount: totals.vatAmount,
-          total_ttc: totals.totalTtc,
-          created_by: user?.id ?? null,
-        } as never)
-        .select("id")
-        .single();
+      // Devis + lignes en une transaction ; référence et totaux calculés en base.
+      const { data: quoteId, error } = await supabase.rpc("create_quote", {
+        p_client_id: clientId,
+        p_items: clean,
+        p_lead_id: leadId,
+        p_installation_id: installationId || null,
+        p_valid_until: nullIfEmpty(validUntil),
+        p_notes: nullIfEmpty(notes),
+        p_discount_ht: totals.discountHt,
+      });
       if (error) throw error;
-
-      const { error: itemsErr } = await supabase.from("quote_items").insert(
-        clean.map((item, index) => ({
-          quote_id: quote.id,
-          label: item.label,
-          description: item.description,
-          quantity: item.quantity,
-          unit_price_ht: item.unit_price_ht,
-          vat_rate: item.vat_rate,
-          position: index,
-          service_catalog_id: item.service_catalog_id,
-        })) as never,
-      );
-      if (itemsErr) {
-        await supabase.from("quotes").delete().eq("id", quote.id);
-        throw itemsErr;
-      }
+      const quote = { id: quoteId };
 
       await logActivity({
         activity_type: "QUOTE_CREATED",

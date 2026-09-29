@@ -52,7 +52,6 @@ export function InvoiceCreatePage() {
   });
 
   const [clientId, setClientId] = useState(params.get("client") ?? "");
-  const [issuedAt, setIssuedAt] = useState(todayISO());
   const [dueAt, setDueAt] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<Line[]>([emptyLine()]);
@@ -76,31 +75,15 @@ export function InvoiceCreatePage() {
         .filter((i) => i.label && i.quantity > 0);
       if (clean.length === 0) throw new Error("Ajoutez au moins une ligne");
 
-      const { data: invoice, error } = await supabase
-        .from("invoices")
-        .insert({
-          client_id: clientId,
-          issued_at: issuedAt,
-          due_at: nullIfEmpty(dueAt),
-          status: "unpaid",
-          notes: nullIfEmpty(notes),
-          subtotal_ht: 0,
-          vat_amount: 0,
-          total_ttc: 0,
-          created_by: user?.id ?? null,
-        } as never)
-        .select("id")
-        .single();
+      // Facture + lignes en une transaction ; numéro, date et totaux imposés par la base.
+      const { data: invoiceId, error } = await supabase.rpc("create_invoice", {
+        p_client_id: clientId,
+        p_items: clean,
+        p_due_at: nullIfEmpty(dueAt),
+        p_notes: nullIfEmpty(notes),
+      });
       if (error) throw error;
-
-      const { error: itemsErr } = await supabase.from("invoice_items").insert(
-        clean.map((item, index) => ({
-          invoice_id: invoice.id,
-          ...item,
-          position: index,
-        })) as never,
-      );
-      if (itemsErr) throw itemsErr;
+      const invoice = { id: invoiceId };
 
       await logActivity({
         activity_type: "INVOICE_CREATED",
@@ -141,11 +124,11 @@ export function InvoiceCreatePage() {
             </div>
             <div>
               <Label>Date d&apos;émission</Label>
-              <Input type="date" value={issuedAt} onChange={(e) => setIssuedAt(e.target.value)} />
+              <Input type="date" value={todayISO()} disabled title="Fixée au jour d’émission (numérotation chronologique)" />
             </div>
             <div>
-              <Label>Échéance</Label>
-              <Input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
+              <Label>Échéance (J+30 si vide)</Label>
+              <Input type="date" min={todayISO()} value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
             </div>
           </div>
 

@@ -1,27 +1,40 @@
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Wallet } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { ArrowLeft, Ban, Wallet } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingState } from "@/components/ui/loading-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { InvoiceStatusBadge } from "@/components/ui/status-badge";
 import { TableShell, Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { RoleGate } from "@/components/auth/ProtectedRoute";
+import { useAuth } from "@/contexts/AuthContext";
+import { isAdmin } from "@/lib/auth/permissions";
 import { supabase } from "@/lib/supabase/client";
 import { PAYMENT_METHOD_LABELS } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { Tables } from "@/lib/supabase/types";
 
 async function fetchInvoice(id: string) {
-  const [{ data: invoice, error }, { data: balance }, { data: items }, { data: payments }] =
-    await Promise.all([
-      supabase.from("invoices").select("*").eq("id", id).single(),
-      supabase.from("invoice_balances").select("*").eq("invoice_id", id).maybeSingle(),
-      supabase.from("invoice_items").select("*").eq("invoice_id", id).order("position"),
-      supabase.from("payments").select("*").eq("invoice_id", id).order("paid_at", { ascending: false }),
-    ]);
+  const [
+    { data: invoice, error },
+    { data: balance },
+    { data: items },
+    { data: payments },
+    { data: creditNote },
+  ] = await Promise.all([
+    supabase.from("invoices").select("*").eq("id", id).single(),
+    supabase.from("invoice_balances").select("*").eq("invoice_id", id).maybeSingle(),
+    supabase.from("invoice_items").select("*").eq("invoice_id", id).order("position"),
+    supabase.from("payments").select("*").eq("invoice_id", id).order("paid_at", { ascending: false }),
+    supabase.from("credit_notes").select("id, number, issued_at, reason").eq("invoice_id", id).maybeSingle(),
+  ]);
   if (error) throw error;
   const inv = invoice as Tables<"invoices">;
   const { data: client } = await supabase
@@ -35,6 +48,7 @@ async function fetchInvoice(id: string) {
     balance,
     items: (items ?? []) as Tables<"invoice_items">[],
     payments: (payments ?? []) as Tables<"payments">[],
+    creditNote,
     client,
   };
 }
@@ -42,10 +56,31 @@ async function fetchInvoice(id: string) {
 export function InvoiceDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const { role } = useAuth();
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [reason, setReason] = useState("");
   const query = useQuery({
     queryKey: ["invoice", id],
     queryFn: () => fetchInvoice(id),
     enabled: Boolean(id),
+  });
+
+  // Une facture émise ne se modifie ni ne se supprime : on l'annule par un avoir.
+  const cancel = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("cancel_invoice", { p_invoice_id: id, p_reason: reason.trim() });
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      toast.success("Facture annulée — avoir émis");
+      setCancelOpen(false);
+      setReason("");
+      await qc.invalidateQueries({ queryKey: ["invoice", id] });
+      await qc.invalidateQueries({ queryKey: ["invoices"] });
+      await qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   if (query.isLoading) return <LoadingState />;
@@ -53,7 +88,8 @@ export function InvoiceDetailPage() {
     return <EmptyState title="Facture introuvable" description={String(query.error ?? "")} />;
   }
 
-  const { invoice, balance, items, payments, client } = query.data;
+  const { invoice, balance, items, payments, creditNote, client } = query.data;
+  const canCancel = isAdmin(role) && invoice.status !== "cancelled" && payments.length === 0;
 
   return (
     <div>
@@ -91,9 +127,23 @@ export function InvoiceDetailPage() {
                 </Button>
               )}
             </RoleGate>
+            {canCancel && (
+              <Button variant="outline" size="sm" onClick={() => setCancelOpen(true)}>
+                <Ban className="size-3.5" />
+                Annuler par avoir
+              </Button>
+            )}
           </div>
         }
       />
+
+      {invoice.status === "cancelled" && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-950">
+          Facture annulée{invoice.cancelled_at ? ` le ${formatDate(invoice.cancelled_at)}` : ""}
+          {creditNote ? <> par l’avoir <b>{creditNote.number}</b></> : null}
+          {invoice.cancellation_reason ? ` — motif : ${invoice.cancellation_reason}` : ""}
+        </div>
+      )}
 
       <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
         Facturation électronique 2026 : PDF lisible + couche structurée (Factur-X / UBL / CII) <b>prête pour transmission</b>. Aucune PDP n’est connectée — aucune transmission n’est prétendue réussie.
@@ -104,6 +154,9 @@ export function InvoiceDetailPage() {
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Total TTC</p>
             <p className="text-lg font-semibold">{formatCurrency(balance?.total_ttc ?? invoice.total_ttc)}</p>
+            {Number(invoice.discount_ht) > 0 && (
+              <p className="text-xs text-muted-foreground">dont remise HT : − {formatCurrency(invoice.discount_ht)}</p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -178,6 +231,32 @@ export function InvoiceDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog
+        open={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        title={`Annuler la facture ${invoice.number ?? ""}`}
+        description="Un avoir du même montant sera émis. La facture restera consultable mais ne pourra plus être modifiée ni encaissée. Action définitive."
+      >
+        <div className="space-y-3">
+          <div>
+            <Label>Motif *</Label>
+            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex. : erreur de client, prestation annulée…" />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setCancelOpen(false)} disabled={cancel.isPending}>
+              Retour
+            </Button>
+            <Button
+              className="bg-destructive text-white hover:bg-destructive/90"
+              disabled={!reason.trim() || cancel.isPending}
+              onClick={() => cancel.mutate()}
+            >
+              {cancel.isPending ? "Patientez…" : "Émettre l’avoir"}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }
