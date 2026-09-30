@@ -29,7 +29,9 @@ AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.staff_profiles
     WHERE user_id = auth.uid()
-      AND role IN ('admin', 'commercial', 'prestataire')
+      -- ::text : la valeur 'prestataire' vient d'être ajoutée à l'enum dans cette même
+      -- transaction, Postgres refuse de l'utiliser comme littéral enum avant le COMMIT.
+      AND role::text IN ('admin', 'commercial', 'prestataire')
   );
 $$;
 

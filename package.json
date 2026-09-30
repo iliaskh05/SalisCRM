@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "tsc -b --pretty false",
     "typecheck": "tsc -b --pretty false",
-    "test:db": "node supabase/tests/invoicing-integrity.test.mjs"
+    "test:db": "node supabase/tests/invoicing-integrity.test.mjs && node supabase/tests/security.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

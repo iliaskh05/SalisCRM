@@ -1,69 +1,12 @@
-// Tests d'intégration des migrations sur un Postgres embarqué (PGlite).
+// Tests facturation : numérotation, totaux, verrouillage, avoirs, paiements.
 // Lancer : npm run test:db
-// Les objets Supabase / pro-extract-hub absents du repo (auth, rôles, leads, staff_profiles)
-// sont simulés ; les migrations storage et realtime sont ignorées.
-import { PGlite } from "@electric-sql/pglite";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { calculateQuote } from "../../src/lib/quotes/calculate.ts";
+import { createTestDb, MIG, USERS } from "./_harness.mjs";
 
-const MIG = fileURLToPath(new URL("../migrations", import.meta.url));
-const db = new PGlite();
-
-const ADMIN = "00000000-0000-0000-0000-00000000000a";
-const COMM = "00000000-0000-0000-0000-00000000000c";
-const RANDO = "00000000-0000-0000-0000-00000000000f";
-
-// ---- Stubs Supabase / pro-extract-hub ----
-await db.exec(`
-  CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN BYPASSRLS;
-  CREATE SCHEMA auth;
-  CREATE TABLE auth.users (id uuid PRIMARY KEY);
-  CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  GRANT USAGE ON SCHEMA public, auth TO anon, authenticated, service_role;
-  GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated;
-  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
-  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
-  CREATE TYPE public.staff_role AS ENUM ('admin', 'commercial', 'prestataire');
-  CREATE TABLE public.staff_profiles (user_id uuid PRIMARY KEY, role public.staff_role NOT NULL, display_name text, created_at timestamptz DEFAULT now());
-  CREATE TABLE public.leads (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), status text, source text, email text, company_name text, contact_name text, city text, message text, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now());
-  INSERT INTO auth.users VALUES ('${ADMIN}'), ('${COMM}'), ('${RANDO}');
-`);
-
-const skip = ["storage", "quote_request_pipeline"];
-for (const f of readdirSync(MIG).sort()) {
-  if (skip.some((s) => f.includes(s))) continue;
-  try { await db.exec(readFileSync(join(MIG, f), "utf8")); } catch (e) { console.log("MIGRATION FAIL", f, e.message, e.where ?? ""); process.exit(2); }
-  console.log("migrated", f);
-}
-await db.exec(`INSERT INTO public.staff_profiles (user_id, role) VALUES ('${ADMIN}', 'admin'), ('${COMM}', 'commercial');`);
-
-// ---- Helpers ----
-let pass = 0, fail = 0;
-async function as(role, uid, sql, params) {
-  await db.exec(`RESET ROLE; SELECT set_config('request.jwt.claim.sub', '${uid ?? ""}', false);`);
-  if (role) await db.exec(`SET ROLE ${role}`);
-  try {
-    return await db.query(sql, params);
-  } finally {
-    await db.exec("RESET ROLE");
-  }
-}
-const asComm = (s, p) => as("authenticated", COMM, s, p);
-const asAdmin = (s, p) => as("authenticated", ADMIN, s, p);
-const asSuper = (s, p) => as(null, null, s, p);
-function ok(name, cond, extra = "") {
-  if (cond) { pass++; console.log("  ✔", name); } else { fail++; console.log("  ✘", name, extra); }
-}
-async function rejects(name, fn, match) {
-  try { await fn(); fail++; console.log("  ✘", name, "(aucune erreur)"); }
-  catch (e) {
-    const m = String(e.message);
-    if (!match || m.includes(match)) { pass++; console.log("  ✔", name, "→", m); }
-    else { fail++; console.log("  ✘", name, "→ message inattendu:", m); }
-  }
-}
+const { db, as, ok, rejects, done, asAdmin, asComm, asSuper } = await createTestDb();
+const RANDO = USERS.RANDO;
 
 console.log("\n# Numérotation client");
 const c = (await asComm(`INSERT INTO clients (company_name) VALUES ('Brasserie Test') RETURNING id, reference`)).rows[0];
@@ -168,5 +111,4 @@ try {
   ok("migration rejouable", false, e.message);
 }
 
-console.log(`\n${pass} OK, ${fail} échec(s)`);
-process.exit(fail ? 1 : 0);
+done();
