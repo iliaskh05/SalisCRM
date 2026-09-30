@@ -7,6 +7,19 @@ export const loginSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>;
 
+/** Même règle que Supabase Auth (minimum 10, minuscules + majuscules + chiffres). */
+export const newPasswordSchema = z
+  .object({
+    password: z
+      .string()
+      .min(10, "10 caractères minimum")
+      .regex(/[a-z]/, "Au moins une minuscule")
+      .regex(/[A-Z]/, "Au moins une majuscule")
+      .regex(/[0-9]/, "Au moins un chiffre"),
+    confirm: z.string(),
+  })
+  .refine((v) => v.password === v.confirm, { message: "Les mots de passe ne correspondent pas", path: ["confirm"] });
+
 export const leadStatusSchema = z.enum([
   "new",
   "contacted",

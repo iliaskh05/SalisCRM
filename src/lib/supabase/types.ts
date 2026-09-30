@@ -201,6 +201,7 @@ export type Database = {
           specialty: string | null;
           cost_rate: number | null;
           status: ProviderStatus;
+          user_id: string | null;
           notes: string | null;
           created_at: string;
           updated_at: string;
@@ -484,6 +485,41 @@ export type Database = {
       cancel_invoice: {
         Args: { p_invoice_id: string; p_reason: string };
         Returns: string;
+      };
+      list_staff_users: {
+        Args: Record<string, never>;
+        Returns: {
+          user_id: string;
+          email: string;
+          display_name: string | null;
+          role: StaffRole;
+          last_sign_in_at: string | null;
+          provider_id: string | null;
+          provider_name: string | null;
+        }[];
+      };
+      list_access_requests: {
+        Args: Record<string, never>;
+        Returns: {
+          user_id: string;
+          email: string;
+          display_name: string | null;
+          requested_role: string | null;
+          created_at: string;
+        }[];
+      };
+      grant_staff_access: {
+        Args: {
+          p_user_id: string;
+          p_role: StaffRole;
+          p_display_name?: string | null;
+          p_provider_id?: string | null;
+        };
+        Returns: undefined;
+      };
+      revoke_staff_access: {
+        Args: { p_user_id: string };
+        Returns: undefined;
       };
     };
     Enums: {

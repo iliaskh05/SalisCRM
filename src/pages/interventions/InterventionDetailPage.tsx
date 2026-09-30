@@ -52,6 +52,13 @@ async function fetchIntervention(id: string) {
   };
 }
 
+/** Miroir de trg_interventions_provider_guard : démarrer ou terminer, rien d’autre. */
+function providerStatusOptions(current: InterventionStatus): InterventionStatus[] {
+  if (current === "to_plan" || current === "planned") return [current, "in_progress", "completed"];
+  if (current === "in_progress") return [current, "completed"];
+  return [current];
+}
+
 export function InterventionDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
@@ -74,6 +81,9 @@ export function InterventionDetailPage() {
   });
 
   const intervention = query.data?.intervention;
+  // Le prestataire ne fait qu’avancer SES interventions (contrôle réel : RLS + trigger en base)
+  const isProvider = role === "prestataire";
+  const providerLocked = isProvider && (intervention?.status === "completed" || intervention?.status === "cancelled");
   const [form, setForm] = useState({
     provider_id: "",
     scheduled_date: "",
@@ -106,20 +116,22 @@ export function InterventionDetailPage() {
         form.status === "completed" && intervention.status !== "completed"
           ? new Date().toISOString()
           : intervention.completed_at;
+      const changes = isProvider
+        ? { status: form.status, notes: nullIfEmpty(form.notes), completed_at: completed }
+        : {
+            provider_id: nullIfEmpty(form.provider_id),
+            scheduled_date: nullIfEmpty(form.scheduled_date),
+            time_slot: nullIfEmpty(form.time_slot),
+            service_type: nullIfEmpty(form.service_type),
+            status: form.status,
+            description: nullIfEmpty(form.description),
+            price_ht: form.price_ht === "" ? null : Number(form.price_ht),
+            notes: nullIfEmpty(form.notes),
+            completed_at: completed,
+          };
       const { error } = await supabase
         .from("interventions")
-        .update({
-          provider_id: nullIfEmpty(form.provider_id),
-          scheduled_date: nullIfEmpty(form.scheduled_date),
-          time_slot: nullIfEmpty(form.time_slot),
-          service_type: nullIfEmpty(form.service_type),
-          status: form.status,
-          description: nullIfEmpty(form.description),
-          price_ht: form.price_ht === "" ? null : Number(form.price_ht),
-          notes: nullIfEmpty(form.notes),
-          completed_at: completed,
-          updated_at: new Date().toISOString(),
-        } as never)
+        .update({ ...changes, updated_at: new Date().toISOString() } as never)
         .eq("id", intervention.id);
       if (error) throw error;
 
@@ -196,6 +208,7 @@ export function InterventionDetailPage() {
                   <Input
                     type="date"
                     value={form.scheduled_date}
+                    disabled={isProvider}
                     onChange={(e) => setForm((f) => ({ ...f, scheduled_date: e.target.value }))}
                   />
                 </div>
@@ -203,6 +216,7 @@ export function InterventionDetailPage() {
                   <Label>Créneau</Label>
                   <Input
                     value={form.time_slot}
+                    disabled={isProvider}
                     onChange={(e) => setForm((f) => ({ ...f, time_slot: e.target.value }))}
                   />
                 </div>
@@ -210,6 +224,7 @@ export function InterventionDetailPage() {
                   <Label>Prestataire</Label>
                   <Select
                     value={form.provider_id}
+                    disabled={isProvider}
                     onChange={(e) => setForm((f) => ({ ...f, provider_id: e.target.value }))}
                   >
                     <option value="">—</option>
@@ -224,6 +239,7 @@ export function InterventionDetailPage() {
                   <Label>Service</Label>
                   <Input
                     value={form.service_type}
+                    disabled={isProvider}
                     onChange={(e) => setForm((f) => ({ ...f, service_type: e.target.value }))}
                   />
                 </div>
@@ -231,9 +247,10 @@ export function InterventionDetailPage() {
                   <Label>Statut</Label>
                   <Select
                     value={form.status}
+                    disabled={providerLocked}
                     onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as InterventionStatus }))}
                   >
-                    {(Object.keys(INTERVENTION_STATUS_LABELS) as InterventionStatus[]).map((s) => (
+                    {(isProvider ? providerStatusOptions(intervention!.status) : (Object.keys(INTERVENTION_STATUS_LABELS) as InterventionStatus[])).map((s) => (
                       <option key={s} value={s}>
                         {INTERVENTION_STATUS_LABELS[s]}
                       </option>
@@ -246,6 +263,7 @@ export function InterventionDetailPage() {
                     type="number"
                     step="0.01"
                     value={form.price_ht}
+                    disabled={isProvider}
                     onChange={(e) => setForm((f) => ({ ...f, price_ht: e.target.value }))}
                   />
                 </div>
@@ -253,6 +271,7 @@ export function InterventionDetailPage() {
                   <Label>Description</Label>
                   <Textarea
                     value={form.description}
+                    disabled={isProvider}
                     onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                   />
                 </div>
@@ -260,14 +279,17 @@ export function InterventionDetailPage() {
                   <Label>Notes</Label>
                   <Textarea
                     value={form.notes}
+                    disabled={providerLocked}
                     onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                   />
                 </div>
-                <div className="sm:col-span-2 text-sm text-muted-foreground">
-                  Prix actuel : {formatCurrency(intervention!.price_ht)}
-                </div>
+                {!isProvider && (
+                  <div className="sm:col-span-2 text-sm text-muted-foreground">
+                    Prix actuel : {formatCurrency(intervention!.price_ht)}
+                  </div>
+                )}
                 <div className="sm:col-span-2">
-                  <Button type="submit" disabled={save.isPending}>
+                  <Button type="submit" disabled={save.isPending || providerLocked}>
                     Enregistrer
                   </Button>
                 </div>

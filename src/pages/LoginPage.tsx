@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { loginSchema } from "@/lib/validations";
@@ -48,7 +48,7 @@ export function LoginPage() {
           <BrandLogo size="xl" align="center" />
           <h1 className="mt-5 text-center text-xl font-semibold tracking-tight text-ink">SalisCRM</h1>
           <p className="mt-1 text-center text-sm text-muted-foreground">
-            Espace interne — direction & équipe commerciale
+            Espace interne — direction, commerciaux et prestataires
           </p>
         </div>
 
@@ -89,14 +89,16 @@ export function LoginPage() {
                 toast.error("Saisissez votre email");
                 return;
               }
-              const { error } = await supabase.auth.resetPasswordForEmail(email);
+              const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+                redirectTo: `${window.location.origin}/definir-mot-de-passe`,
+              });
               if (error) toast.error(error.message);
-              else toast.success("Si le compte existe, un e-mail de réinitialisation a été préparé (prêt à connecter).");
+              else toast.success("Si un compte existe pour cette adresse, un e-mail de réinitialisation vient d’être envoyé.");
             }}
           >
             Mot de passe oublié
           </button>
-          <Link to="/register" className="text-teal-700">Demander un accès</Link>
+          <p className="text-xs text-muted-foreground">Pas encore d’accès ? Demandez une invitation à la direction.</p>
         </div>
       </div>
     </div>

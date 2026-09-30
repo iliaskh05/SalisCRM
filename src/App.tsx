@@ -1,13 +1,13 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
 import { getSupabaseConfigStatus } from "@/lib/supabase/client";
 import { SetupPage } from "@/pages/SetupPage";
 import { LoginPage } from "@/pages/LoginPage";
-import { RegisterPage } from "@/pages/RegisterPage";
+import { SetPasswordPage } from "@/pages/SetPasswordPage";
 import { UnauthorizedPage } from "@/pages/UnauthorizedPage";
 import { CommercialsPage } from "@/pages/commercials/CommercialsPage";
 import { DashboardPage } from "@/pages/DashboardPage";
@@ -44,6 +44,12 @@ const queryClient = new QueryClient({
   },
 });
 
+/** Le prestataire n’a pas de tableau de bord commercial : il arrive sur ses interventions. */
+function HomePage() {
+  const { role } = useAuth();
+  return role === "prestataire" ? <Navigate to="/interventions" replace /> : <DashboardPage />;
+}
+
 export default function App() {
   if (isDemoMode()) {
     return <DemoApp />;
@@ -59,13 +65,14 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/definir-mot-de-passe" element={<SetPasswordPage />} />
+            <Route path="/register" element={<Navigate to="/login" replace />} />
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
             <Route element={<ProtectedRoute />}>
               <Route element={<AppShell />}>
                 <Route element={<ProtectedRoute permission="dashboard:view" />}>
-                  <Route index element={<DashboardPage />} />
+                  <Route index element={<HomePage />} />
                 </Route>
 
                 <Route element={<ProtectedRoute permission="leads:read" />}>

@@ -1,3 +1,4 @@
+import { isDemoMode } from "@/lib/demo/mode";
 import type { Json } from "@/lib/supabase/types";
 
 export type LeadPhoto = {
@@ -56,4 +57,19 @@ export function parseLeadPhotos(photos: Json | LeadPhoto[] | null | undefined): 
       },
     ];
   });
+}
+
+/**
+ * Les leads viennent d’un formulaire public : on n’affiche que les images servies par
+ * notre projet Supabase (pas de pixel de suivi externe, pas de data:/javascript:).
+ */
+export function isTrustedPhotoUrl(url: string | undefined): url is string {
+  if (!url) return false;
+  if (isDemoMode()) return true;
+  try {
+    const origin = new URL(import.meta.env.VITE_SUPABASE_URL).origin;
+    return new URL(url).origin === origin;
+  } catch {
+    return false;
+  }
 }

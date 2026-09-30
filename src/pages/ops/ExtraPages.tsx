@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useState } from "react";
 import { BrandLogo } from "@/components/brand/BrandLogo";
+import { StaffAccessManager } from "@/components/settings/StaffAccessManager";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -121,13 +122,13 @@ export function CatalogPage() {
 export function SettingsPage() {
   return (
     <div>
-      <PageHeader title="Paramètres" description="Identité société, numérotation et catalogue." />
-      <Card>
+      <PageHeader title="Paramètres" description="Accès de l’équipe, identité société et catalogue." />
+      <StaffAccessManager />
+      <Card className="mt-4">
         <CardContent className="space-y-3 pt-5 text-sm">
           <BrandLogo size="md" />
           <p>Salis 3 Hottes · 12 rue de la Fontaine, 75011 Paris</p>
           <p>SIREN 848 392 017 · SIRET 848 392 017 00017 · TVA FR48 848392017</p>
-          <p>Les utilisateurs et rôles se gèrent dans Supabase (staff_profiles). L’inscription publique ne peut pas s’auto-promouvoir admin.</p>
           <p>Facturation électronique : architecture prête (Factur-X / UBL / CII). Aucune PDP n’est connectée.</p>
           <Link to="/produits" className="text-teal-700">Ouvrir le catalogue</Link>
         </CardContent>

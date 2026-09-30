@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Dialog } from "@/components/ui/dialog";
-import { parseLeadPhotos, type LeadPhoto } from "@/lib/quote-requests/photos";
+import { isTrustedPhotoUrl, parseLeadPhotos, type LeadPhoto } from "@/lib/quote-requests/photos";
 import { STORAGE_BUCKETS } from "@/lib/constants";
 import { supabase } from "@/lib/supabase/client";
 import type { Json } from "@/lib/supabase/types";
 
 export function RequestPhotos({ photos }: { photos: Json | LeadPhoto[] | null | undefined }) {
-  const items = parseLeadPhotos(photos);
+  // URL externes écartées : on retombe sur le chemin Storage (URL signée) quand il existe
+  const items = parseLeadPhotos(photos).map((p) => (isTrustedPhotoUrl(p.url) ? p : { ...p, url: undefined }));
   const [active, setActive] = useState<LeadPhoto | null>(null);
   const [signed, setSigned] = useState<Record<string, string>>({});
 
@@ -24,7 +25,11 @@ export function RequestPhotos({ photos }: { photos: Json | LeadPhoto[] | null | 
       return;
     }
     const { data } = await supabase.storage.from(STORAGE_BUCKETS.leadDocuments).createSignedUrl(photo.path, 3600);
-    const url = data?.signedUrl ?? photo.path;
+    const url = data?.signedUrl;
+    if (!url) {
+      setActive({ ...photo, url: undefined });
+      return;
+    }
     setSigned((prev) => ({ ...prev, [photo.path]: url }));
     setActive({ ...photo, url });
   }
