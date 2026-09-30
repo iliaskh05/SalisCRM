@@ -88,7 +88,7 @@ export function QuoteRequestDetailPage() {
           assigned_user: nullIfEmpty(assigned),
           notes: nullIfEmpty(notes),
           updated_at: new Date().toISOString(),
-        } as never)
+        })
         .eq("id", lead.id);
       if (error) throw error;
       if (status !== lead.status) {

@@ -184,7 +184,7 @@ export function PaymentCreatePage() {
           reference: nullIfEmpty(reference),
           note: nullIfEmpty(note),
           created_by: user?.id ?? null,
-        } as never)
+        })
         .select("id")
         .single();
       if (error) throw error;

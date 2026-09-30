@@ -11,7 +11,10 @@
     "typecheck": "tsc -b --pretty false",
     "test:db": "node supabase/tests/invoicing-integrity.test.mjs && node supabase/tests/security.test.mjs && node supabase/tests/operations.test.mjs && node supabase/tests/privacy.test.mjs",
     "test:unit": "node --test src/lib/pdf/pdf.test.ts",
-    "test:functions": "node --test supabase/tests/send-document-email.test.mjs"
+    "test:functions": "node --test supabase/tests/send-document-email.test.mjs",
+    "types:gen": "node scripts/gen-types.mjs",
+    "types:check": "node scripts/gen-types.mjs --check",
+    "test:e2e": "node e2e/smoke.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -39,6 +42,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.2.0",
+    "playwright": "^1.63.0",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.8.3",
     "vite": "^8.2.0",

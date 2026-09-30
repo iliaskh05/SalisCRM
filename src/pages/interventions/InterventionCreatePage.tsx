@@ -82,7 +82,7 @@ export function InterventionCreatePage() {
           price_ht: form.price_ht === "" ? null : Number(form.price_ht),
           notes: nullIfEmpty(form.notes),
           created_by: user?.id ?? null,
-        } as never)
+        })
         .select("id")
         .single();
       if (error) throw error;

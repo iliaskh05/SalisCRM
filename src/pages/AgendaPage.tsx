@@ -10,16 +10,19 @@ import { LoadingState } from "@/components/ui/loading-state";
 import { InterventionStatusBadge } from "@/components/ui/status-badge";
 import { supabase } from "@/lib/supabase/client";
 import { selectAll } from "@/lib/supabase/select-all";
+import { fetchInterventions } from "@/lib/interventions";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Tables } from "@/lib/supabase/types";
 
 export function AgendaPage() {
   const [view, setView] = useState<"day" | "week" | "month">("week");
   const [anchor] = useState(new Date());
+  const { role } = useAuth();
   const query = useQuery({
-    queryKey: ["agenda"],
+    queryKey: ["agenda", role],
     queryFn: async () => {
       const [{ data: interventions, error }, { data: clients }] = await Promise.all([
-        selectAll((from, to) => supabase.from("interventions").select("*").order("scheduled_date").order("id").range(from, to)),
+        fetchInterventions(role, { ascending: true }),
         selectAll((from, to) => supabase.from("clients").select("id, company_name, city").order("id").range(from, to)),
       ]);
       if (error) throw error;

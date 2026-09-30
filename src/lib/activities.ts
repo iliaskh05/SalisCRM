@@ -18,7 +18,7 @@ export async function logActivity(input: {
     lead_id: input.lead_id ?? null,
     metadata: input.metadata ?? {},
     created_by: input.created_by ?? null,
-  } as never);
+  });
 
   if (error) {
     console.error("[activities]", error.message);

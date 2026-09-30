@@ -27,6 +27,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Types de base de données à jour avec les migrations
+        run: npm run types:check
+
       - name: Build
         run: npm run build
         env:
@@ -42,3 +45,23 @@ jobs:
 
       - name: Migrations + tests (Postgres embarqué)
         run: npm run test:db
+
+  e2e:
+    name: Test navigateur (Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Installer Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Test navigateur (faux serveur Supabase)
+        run: npm run test:e2e

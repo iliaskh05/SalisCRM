@@ -35,7 +35,7 @@ Les règles critiques sont **en base**, pas dans le navigateur. Le front ne fait
 Rôles :
 - **admin (direction)** : tout, y compris avoirs, suppressions, gestion des accès.
 - **commercial** : clients, devis, factures, paiements, interventions.
-- **prestataire** : uniquement ses interventions (avancement, notes, photos, rapport). Aucune donnée financière.
+- **prestataire** : uniquement ses interventions (avancement, notes, photos, rapport). Aucune donnée financière : il lit la vue `provider_interventions` (sans prix HT) et avance ses interventions par `provider_update_intervention` ; il n'a aucun accès direct à la table `interventions`.
 
 ## Documents PDF
 
@@ -64,7 +64,7 @@ Chaque utilisateur peut l'activer depuis **Sécurité du compte** (menu latéral
 
 - **Téléphone perdu** : dans le tableau de bord Supabase → Authentication → Users → l'utilisateur → supprimer le facteur MFA. L'utilisateur se reconnecte avec son mot de passe seul.
 - **Dernier admin verrouillé** : même procédure (dashboard), ou SQL : `DELETE FROM auth.mfa_factors WHERE user_id = '<uuid>';`.
-- Non obligatoire pour l'instant : à activer d'abord pour la direction.
+- **Obligatoire pour la direction (interrupteur)** : Paramètres → « Double authentification de la direction » → « Rendre obligatoire ». Désactivé par défaut. Un administrateur sans double authentification n'a alors plus accès à rien jusqu'à ce qu'il l'active (il est redirigé vers « Sécurité du compte »). On ne peut l'activer que depuis un compte qui l'a lui-même activée, et l'écran liste les administrateurs qui seraient bloqués. **Avant de l'activer en production**, vérifiez que TOTP est bien activé dans Supabase (Authentication → Multi-Factor) en enrôlant votre propre compte.
 
 ## RGPD
 
@@ -75,10 +75,12 @@ Outils pour la direction (voir `docs/RGPD.md`, registre des traitements à valid
 
 ## Base de données
 
+Les types TypeScript des tables, vues et enums (`src/lib/supabase/database.generated.ts`) sont **générés depuis les migrations** (`npm run types:gen`), sans accès à un projet Supabase. Après toute migration, régénérez-les et committez le fichier : la CI le vérifie. Les signatures des fonctions RPC restent écrites à la main dans `src/lib/supabase/types.ts`.
+
 Les migrations sont dans `supabase/migrations/`, toutes rejouables sans effet de bord. La première (`baseline_shared_objects`) recrée `leads`, `staff_profiles` et le bucket `lead-documents`, mais ne modifie rien s'ils existent déjà (cas de la production).
 
 ```bash
-npm run test:db   # joue toutes les migrations sur un Postgres embarqué + 169 contrôles
+npm run test:db   # joue toutes les migrations sur un Postgres embarqué + 189 contrôles
 ```
 
 À lancer avant chaque migration. La CI le fait aussi sur chaque pull request.
@@ -147,3 +149,6 @@ Créer un projet Sentry (plateforme React) et renseigner `VITE_SENTRY_DSN`. Sans
 | `npm run test:db` | migrations + tests base de données |
 | `npm run test:unit` | tests unitaires (génération PDF, ventilation TVA) |
 | `npm run test:functions` | tests des Edge Functions (envoi d'e-mail) |
+| `npm run test:e2e` | test navigateur (Chromium, faux serveur Supabase) ; 1re fois : `npx playwright install chromium` |
+| `npm run types:gen` | régénère `src/lib/supabase/database.generated.ts` depuis les migrations |
+| `npm run types:check` | échoue si ce fichier n'est plus à jour (CI) |

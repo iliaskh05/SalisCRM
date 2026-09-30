@@ -9,7 +9,7 @@ export function ProtectedRoute({
   permission?: Permission;
   children?: React.ReactNode;
 }) {
-  const { loading, isAuthenticated, isStaff, hasPermission } = useAuth();
+  const { loading, isAuthenticated, isStaff, hasPermission, mfaEnrollmentRequired } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -26,6 +26,11 @@ export function ProtectedRoute({
 
   if (!isStaff) {
     return <Navigate to="/unauthorized" replace />;
+  }
+
+  // Double authentification exigée par la direction : seule la page d'activation reste accessible
+  if (mfaEnrollmentRequired && location.pathname !== "/securite") {
+    return <Navigate to="/securite" replace />;
   }
 
   if (permission && !hasPermission(permission)) {

@@ -24,6 +24,9 @@ type AuthState = {
   isStaff: boolean;
   /** Mot de passe validé mais code de double authentification encore attendu */
   needsMfa: boolean;
+  /** La direction exige la double authentification des administrateurs et ce compte n'en a pas encore */
+  mfaEnrollmentRequired: boolean;
+  refreshMfaState: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error: string | null; mfaRequired?: boolean }>;
   verifyMfa: (code: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -64,11 +67,26 @@ async function fetchNeedsMfa(): Promise<boolean> {
   }
 }
 
+/** Administrateur sans double authentification alors que la direction l'exige. */
+async function fetchEnrollmentRequired(role: StaffRole | null): Promise<boolean> {
+  if (role !== "admin") return false;
+  try {
+    const [{ data: policy }, { data: factors }] = await Promise.all([
+      supabase.rpc("security_policy"),
+      supabase.auth.mfa.listFactors(),
+    ]);
+    return policy?.require_admin_mfa === true && (factors?.totp?.length ?? 0) === 0;
+  } catch {
+    return false; // confort d'affichage : la base applique la règle quoi qu'il arrive
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<StaffProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [needsMfa, setNeedsMfa] = useState(false);
+  const [enrollRequired, setEnrollRequired] = useState(false);
 
   const refreshProfile = useCallback(async () => {
     const {
@@ -92,7 +110,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const p = await fetchStaffProfile(data.session.user.id);
         if (mounted) setProfile(p);
         const mfa = await fetchNeedsMfa();
-        if (mounted) setNeedsMfa(mfa);
+        const enroll = mfa ? false : await fetchEnrollmentRequired(p?.role ?? null);
+        if (mounted) {
+          setNeedsMfa(mfa);
+          setEnrollRequired(enroll);
+        }
       }
       if (mounted) setLoading(false);
     });
@@ -102,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!nextSession?.user) {
         setProfile(null);
         setNeedsMfa(false);
+        setEnrollRequired(false);
         setLoading(false);
         return;
       }
@@ -109,9 +132,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void Promise.resolve().then(async () => {
         const p = await fetchStaffProfile(nextSession.user.id);
         const mfa = await fetchNeedsMfa();
+        const enroll = mfa ? false : await fetchEnrollmentRequired(p?.role ?? null);
         if (mounted) {
           setProfile(p);
           setNeedsMfa(mfa);
+          setEnrollRequired(enroll);
           setLoading(false);
         }
       });
@@ -127,9 +152,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
 
+    let profileRole: StaffRole | null = null;
     if (data.user) {
       const p = await fetchStaffProfile(data.user.id);
       setProfile(p);
+      profileRole = p?.role ?? null;
       if (!p) {
         await supabase.auth.signOut();
         setSession(null);
@@ -141,6 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const mfaRequired = await fetchNeedsMfa();
     setNeedsMfa(mfaRequired);
+    if (!mfaRequired) setEnrollRequired(await fetchEnrollmentRequired(profileRole));
     return { error: null, mfaRequired };
   }, []);
 
@@ -161,7 +189,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setProfile(null);
     setNeedsMfa(false);
+    setEnrollRequired(false);
   }, []);
+
+  const refreshMfaState = useCallback(async () => {
+    const mfa = await fetchNeedsMfa();
+    setNeedsMfa(mfa);
+    setEnrollRequired(mfa ? false : await fetchEnrollmentRequired(profile?.role ?? null));
+  }, [profile?.role]);
 
   const role = profile?.role ?? null;
 
@@ -173,6 +208,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role,
       loading,
       needsMfa,
+      mfaEnrollmentRequired: enrollRequired,
+      refreshMfaState,
       // Tant que le code n'est pas saisi, la session ne donne accès à rien
       isAuthenticated: Boolean(session?.user) && !needsMfa,
       isStaff: Boolean(profile),
@@ -182,7 +219,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshProfile,
       hasPermission: (permission) => can(role, permission),
     }),
-    [session, profile, role, loading, needsMfa, signIn, verifyMfa, signOut, refreshProfile],
+    [session, profile, role, loading, needsMfa, enrollRequired, refreshMfaState, signIn, verifyMfa, signOut, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

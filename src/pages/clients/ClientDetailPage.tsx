@@ -365,7 +365,7 @@ function GeneralTab({
           next_action_date: nullIfEmpty(form.next_action_date),
           status: form.status,
           updated_at: new Date().toISOString(),
-        } as never)
+        })
         .eq("id", client.id);
       if (error) throw error;
       if (form.status !== client.status) {
@@ -572,11 +572,11 @@ function InstallationTab({
       if (current) {
         const { error } = await supabase
           .from("client_installations")
-          .update(payload as never)
+          .update(payload)
           .eq("id", current.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("client_installations").insert(payload as never);
+        const { error } = await supabase.from("client_installations").insert(payload);
         if (error) throw error;
       }
     },
@@ -853,7 +853,7 @@ function DocumentsTab({
         mime_type: file.type || null,
         size_bytes: file.size,
         uploaded_by: userId ?? null,
-      } as never);
+      });
       if (error) {
         await supabase.storage.from(STORAGE_BUCKETS.clientDocuments).remove([path]);
         throw error;

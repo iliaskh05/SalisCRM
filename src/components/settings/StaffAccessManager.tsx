@@ -273,6 +273,7 @@ export function StaffAccessManager() {
                   <TR>
                     <TH>Membre</TH>
                     <TH>Rôle</TH>
+                    <TH>Double auth.</TH>
                     <TH>Dernière connexion</TH>
                     <TH />
                   </TR>
@@ -302,6 +303,9 @@ export function StaffAccessManager() {
                               <option value="commercial">{ROLE_LABELS.commercial}</option>
                             </Select>
                           )}
+                        </TD>
+                        <TD>
+                          <Badge variant={m.mfa_enabled ? "success" : "outline"}>{m.mfa_enabled ? "Activée" : "Non"}</Badge>
                         </TD>
                         <TD className="text-xs text-muted-foreground">{formatDateTime(m.last_sign_in_at)}</TD>
                         <TD className="text-right">

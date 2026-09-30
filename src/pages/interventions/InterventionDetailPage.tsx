@@ -26,12 +26,13 @@ import {
   STORAGE_BUCKETS,
 } from "@/lib/constants";
 import { formatCurrency, formatDateTime, nullIfEmpty } from "@/lib/format";
-import type { InterventionStatus, PhotoKind, Tables } from "@/lib/supabase/types";
+import type { InterventionStatus, PhotoKind, StaffRole, Tables } from "@/lib/supabase/types";
+import { fetchInterventionById } from "@/lib/interventions";
 
-async function fetchIntervention(id: string) {
-  const { data, error } = await supabase.from("interventions").select("*").eq("id", id).single();
-  if (error) throw error;
-  const intervention = data as Tables<"interventions">;
+async function fetchIntervention(role: StaffRole | null, id: string) {
+  const { data, error } = await fetchInterventionById(role, id);
+  if (error || !data) throw error ?? new Error("Intervention introuvable");
+  const intervention = data;
 
   const [{ data: client }, { data: provider }, { data: photos }] = await Promise.all([
     supabase.from("clients").select("id, company_name").eq("id", intervention.client_id).maybeSingle(),
@@ -67,8 +68,8 @@ export function InterventionDetailPage() {
   const { user, role } = useAuth();
 
   const query = useQuery({
-    queryKey: ["intervention", id],
-    queryFn: () => fetchIntervention(id),
+    queryKey: ["intervention", id, role],
+    queryFn: () => fetchIntervention(role, id),
     enabled: Boolean(id),
   });
 
@@ -113,26 +114,37 @@ export function InterventionDetailPage() {
   const save = useMutation({
     mutationFn: async () => {
       if (!intervention) return;
+
+      // Prestataire : fonction dédiée (statut + notes). Elle horodate la fin et journalise
+      // elle-même ; il n'a plus aucun accès direct à la table (prix, affectation).
+      if (isProvider) {
+        const { error } = await supabase.rpc("provider_update_intervention", {
+          p_intervention_id: intervention.id,
+          p_status: form.status,
+          p_notes: nullIfEmpty(form.notes),
+        });
+        if (error) throw error;
+        return;
+      }
+
       const completed =
         form.status === "completed" && intervention.status !== "completed"
           ? new Date().toISOString()
           : intervention.completed_at;
-      const changes = isProvider
-        ? { status: form.status, notes: nullIfEmpty(form.notes), completed_at: completed }
-        : {
-            provider_id: nullIfEmpty(form.provider_id),
-            scheduled_date: nullIfEmpty(form.scheduled_date),
-            time_slot: nullIfEmpty(form.time_slot),
-            service_type: nullIfEmpty(form.service_type),
-            status: form.status,
-            description: nullIfEmpty(form.description),
-            price_ht: form.price_ht === "" ? null : Number(form.price_ht),
-            notes: nullIfEmpty(form.notes),
-            completed_at: completed,
-          };
       const { error } = await supabase
         .from("interventions")
-        .update({ ...changes, updated_at: new Date().toISOString() } as never)
+        .update({
+          provider_id: nullIfEmpty(form.provider_id),
+          scheduled_date: nullIfEmpty(form.scheduled_date),
+          time_slot: nullIfEmpty(form.time_slot),
+          service_type: nullIfEmpty(form.service_type),
+          status: form.status,
+          description: nullIfEmpty(form.description),
+          price_ht: form.price_ht === "" ? null : Number(form.price_ht),
+          notes: nullIfEmpty(form.notes),
+          completed_at: completed,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", intervention.id);
       if (error) throw error;
 
@@ -363,7 +375,7 @@ function PhotosSection({
         storage_path: path,
         comment: nullIfEmpty(comment),
         uploaded_by: userId ?? null,
-      } as never);
+      });
       if (error) {
         await supabase.storage.from(STORAGE_BUCKETS.interventionPhotos).remove([path]);
         throw error;

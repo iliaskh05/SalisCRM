@@ -74,7 +74,7 @@ export function QuoteDetailPage() {
           status,
           notes: nullIfEmpty(notes),
           updated_at: new Date().toISOString(),
-        } as never)
+        })
         .eq("id", quote.id);
       if (error) throw error;
 
@@ -302,13 +302,13 @@ export function QuoteDetailPage() {
         onConfirm={async (delivery) => {
           const { error } = await supabase
             .from("quotes")
-            .update({ status: "sent", updated_at: new Date().toISOString() } as never)
+            .update({ status: "sent", updated_at: new Date().toISOString() })
             .eq("id", quote!.id);
           if (error) throw error;
           if (quote!.lead_id) {
             await supabase
               .from("leads")
-              .update({ status: "quote_sent", updated_at: new Date().toISOString() } as never)
+              .update({ status: "quote_sent", updated_at: new Date().toISOString() })
               .eq("id", quote!.lead_id);
           }
           await logActivity({

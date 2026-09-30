@@ -107,10 +107,10 @@ export function ProvidersPage() {
         updated_at: new Date().toISOString(),
       };
       if (editing) {
-        const { error } = await supabase.from("providers").update(payload as never).eq("id", editing.id);
+        const { error } = await supabase.from("providers").update(payload).eq("id", editing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("providers").insert(payload as never);
+        const { error } = await supabase.from("providers").insert(payload);
         if (error) throw error;
       }
     },

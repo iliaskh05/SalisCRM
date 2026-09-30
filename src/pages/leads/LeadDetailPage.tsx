@@ -100,7 +100,7 @@ export function LeadDetailPage() {
           next_action_date: nullIfEmpty(form.next_action_date),
           assigned_user: nullIfEmpty(form.assigned_user),
           updated_at: new Date().toISOString(),
-        } as never)
+        })
         .eq("id", lead.id);
       if (error) throw error;
 

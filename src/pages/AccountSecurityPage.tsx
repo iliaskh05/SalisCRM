@@ -18,7 +18,7 @@ type Enrollment = { factorId: string; qrCode: string; secret: string };
 /** Activation de la double authentification (application TOTP : Google Authenticator, Authy, 1Password…). */
 export function AccountSecurityPage() {
   const qc = useQueryClient();
-  const { user } = useAuth();
+  const { user, mfaEnrollmentRequired, refreshMfaState } = useAuth();
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [code, setCode] = useState("");
   const [toRemove, setToRemove] = useState<string | null>(null);
@@ -62,6 +62,7 @@ export function AccountSecurityPage() {
       setEnrollment(null);
       setCode("");
       await refresh();
+      await refreshMfaState();
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -84,6 +85,12 @@ export function AccountSecurityPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader title="Sécurité du compte" description={user?.email ?? undefined} />
+      {mfaEnrollmentRequired && (
+        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          La direction exige la double authentification pour les administrateurs. Activez-la ci-dessous pour retrouver l’accès à
+          l’application.
+        </p>
+      )}
 
       <Card>
         <CardHeader>

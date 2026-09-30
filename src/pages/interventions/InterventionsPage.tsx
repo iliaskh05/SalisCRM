@@ -16,13 +16,15 @@ import { supabase } from "@/lib/supabase/client";
 import { selectAll } from "@/lib/supabase/select-all";
 import { INTERVENTION_STATUS_LABELS } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/format";
-import type { InterventionStatus, Tables } from "@/lib/supabase/types";
+import type { InterventionStatus, StaffRole, Tables } from "@/lib/supabase/types";
+import { fetchInterventions } from "@/lib/interventions";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Row = Tables<"interventions"> & { client_name?: string; provider_name?: string };
 
-async function fetchInterventions(): Promise<Row[]> {
+async function loadInterventions(role: StaffRole | null): Promise<Row[]> {
   const [{ data, error }, { data: clients }, { data: providers }] = await Promise.all([
-    selectAll((from, to) => supabase.from("interventions").select("*").order("scheduled_date", { ascending: false }).order("id").range(from, to)),
+    fetchInterventions(role, { ascending: false }),
     selectAll((from, to) => supabase.from("clients").select("id, company_name").order("id").range(from, to)),
     supabase.from("providers").select("id, name"),
   ]);
@@ -40,9 +42,10 @@ export function InterventionsPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const { role } = useAuth();
   const { data = [], isLoading, error } = useQuery({
-    queryKey: ["interventions"],
-    queryFn: fetchInterventions,
+    queryKey: ["interventions", role],
+    queryFn: () => loadInterventions(role),
   });
 
   const filtered = useMemo(() => {

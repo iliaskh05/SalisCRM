@@ -60,7 +60,7 @@ export function ClientCreatePage() {
           next_action_date: nullIfEmpty(form.next_action_date),
           status: parsed.status,
           created_by: user?.id ?? null,
-        } as never)
+        })
         .select("id")
         .single();
       if (error) throw error;

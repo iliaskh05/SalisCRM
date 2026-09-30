@@ -226,7 +226,7 @@ export function QuoteCreatePage() {
             status: "quote_requested",
             converted_client_id: clientId,
             updated_at: new Date().toISOString(),
-          } as never)
+          })
           .eq("id", leadId);
       }
 

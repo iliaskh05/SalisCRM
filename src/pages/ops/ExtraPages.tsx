@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { StaffAccessManager } from "@/components/settings/StaffAccessManager";
 import { RetentionManager } from "@/components/settings/RetentionManager";
+import { SecurityPolicyCard } from "@/components/settings/SecurityPolicyCard";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +17,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDateTime } from "@/lib/format";
+import { fetchInterventionById } from "@/lib/interventions";
 import type { Tables } from "@/lib/supabase/types";
 
 export function InterventionReportPage() {
@@ -24,17 +26,17 @@ export function InterventionReportPage() {
   const qc = useQueryClient();
   const { role } = useAuth();
   const query = useQuery({
-    queryKey: ["intervention-report", id],
+    queryKey: ["intervention-report", id, role],
     enabled: Boolean(id),
     queryFn: async () => {
       const [{ data: intervention, error }, { data: report, error: reportError }] = await Promise.all([
-        supabase.from("interventions").select("*").eq("id", id).single(),
+        fetchInterventionById(role, id),
         supabase.from("intervention_reports").select("*").eq("intervention_id", id).maybeSingle(),
       ]);
-      if (error) throw error;
+      if (error || !intervention) throw error ?? new Error("Intervention introuvable");
       if (reportError) throw reportError;
       return {
-        intervention: intervention as Tables<"interventions">,
+        intervention,
         report: report as Tables<"intervention_reports"> | null,
       };
     },
@@ -174,6 +176,9 @@ export function SettingsPage() {
     <div>
       <PageHeader title="Paramètres" description="Accès de l’équipe, identité société et catalogue." />
       <StaffAccessManager />
+      <div className="mt-4">
+        <SecurityPolicyCard />
+      </div>
       <div className="mt-4">
         <RetentionManager />
       </div>
