@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "lint": "tsc -b --pretty false",
     "typecheck": "tsc -b --pretty false",
-    "test:db": "node supabase/tests/invoicing-integrity.test.mjs && node supabase/tests/security.test.mjs && node supabase/tests/operations.test.mjs"
+    "test:db": "node supabase/tests/invoicing-integrity.test.mjs && node supabase/tests/security.test.mjs && node supabase/tests/operations.test.mjs",
+    "test:unit": "node --test src/lib/pdf/pdf.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -19,6 +20,8 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "lucide-react": "^0.575.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

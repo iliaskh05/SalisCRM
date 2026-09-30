@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, FileDown, Printer, Receipt, Send, Wrench } from "lucide-react";
+import { ArrowLeft, Printer, Receipt, Send, Wrench } from "lucide-react";
 import { QuotePreview, printElement } from "@/components/quotes/QuotePreview";
 import { SendQuoteDialog } from "@/components/quotes/SendQuoteDialog";
+import { DownloadPdfButton } from "@/components/pdf/DownloadPdfButton";
+import { quoteToDocument } from "@/lib/pdf/document-model";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -201,16 +203,9 @@ export function QuoteDetailPage() {
             <Button size="sm" variant="outline" onClick={() => printElement(quote!.reference ?? "devis")}>
               <Printer className="size-3.5" />Imprimer
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                printElement(quote!.reference ?? "devis");
-                toast.message("PDF", { description: "Choisissez « Enregistrer au format PDF » dans la boîte d’impression." });
-              }}
-            >
-              <FileDown className="size-3.5" />PDF
-            </Button>
+            <DownloadPdfButton
+              document={quoteToDocument({ quote: loaded, items: query.data.items, client })}
+            />
             <RoleGate permission="interventions:write">
               {quote!.status === "accepted" ? (
                 <Button size="sm" variant="accent" disabled={createIntervention.isPending} onClick={() => createIntervention.mutate()}>

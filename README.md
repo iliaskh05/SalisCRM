@@ -37,6 +37,14 @@ Rôles :
 - **commercial** : clients, devis, factures, paiements, interventions.
 - **prestataire** : uniquement ses interventions (avancement, notes, photos, rapport). Aucune donnée financière.
 
+## Documents PDF
+
+Devis, factures et avoirs se téléchargent en PDF depuis leur fiche (boutons « PDF », « Facture PDF », « Avoir PDF »). Le PDF est généré dans le navigateur (`src/lib/pdf/`, bibliothèque chargée au premier clic) à partir des montants **enregistrés en base** : il n’y a aucun recalcul côté client.
+
+Il contient les mentions obligatoires d’une facture (numéro, dates, identité des deux parties, ventilation HT/TVA par taux, pénalités de retard, indemnité de recouvrement de 40 €, escompte). Les coordonnées bancaires ne sont imprimées que si l’IBAN de `src/lib/company.ts` est valide.
+
+> **À vérifier avant la mise en service** : les informations société de `src/lib/company.ts` (adresse, SIREN/SIRET, TVA, capital, IBAN/BIC) figurent sur chaque document. L’IBAN actuel est un exemple : il ne sera pas imprimé tant qu’il n’est pas remplacé par le vrai.
+
 ## Base de données
 
 Les migrations sont dans `supabase/migrations/`, toutes rejouables sans effet de bord. La première (`baseline_shared_objects`) recrée `leads`, `staff_profiles` et le bucket `lead-documents`, mais ne modifie rien s'ils existent déjà (cas de la production).
@@ -108,3 +116,4 @@ Créer un projet Sentry (plateforme React) et renseigner `VITE_SENTRY_DSN`. Sans
 | `npm run build` | typecheck + build de production (`dist/`) |
 | `npm run typecheck` | vérification TypeScript |
 | `npm run test:db` | migrations + tests base de données |
+| `npm run test:unit` | tests unitaires (génération PDF, ventilation TVA) |

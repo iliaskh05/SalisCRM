@@ -16,6 +16,8 @@ import { TableShell, Table, THead, TBody, TR, TH, TD } from "@/components/ui/tab
 import { RoleGate } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { isAdmin } from "@/lib/auth/permissions";
+import { DownloadPdfButton } from "@/components/pdf/DownloadPdfButton";
+import { creditNoteToDocument, invoiceToDocument } from "@/lib/pdf/document-model";
 import { supabase } from "@/lib/supabase/client";
 import { PAYMENT_METHOD_LABELS } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -33,22 +35,28 @@ async function fetchInvoice(id: string) {
     supabase.from("invoice_balances").select("*").eq("invoice_id", id).maybeSingle(),
     supabase.from("invoice_items").select("*").eq("invoice_id", id).order("position"),
     supabase.from("payments").select("*").eq("invoice_id", id).order("paid_at", { ascending: false }),
-    supabase.from("credit_notes").select("id, number, issued_at, reason").eq("invoice_id", id).maybeSingle(),
+    supabase.from("credit_notes").select("*").eq("invoice_id", id).maybeSingle(),
   ]);
   if (error) throw error;
   const inv = invoice as Tables<"invoices">;
-  const { data: client } = await supabase
-    .from("clients")
-    .select("id, company_name")
-    .eq("id", inv.client_id)
-    .maybeSingle();
+  const [{ data: client }, { data: sourceQuote }] = await Promise.all([
+    supabase
+      .from("clients")
+      .select("id, company_name, contact_name, phone, email, address, postal_code, city, siret")
+      .eq("id", inv.client_id)
+      .maybeSingle(),
+    inv.quote_id
+      ? supabase.from("quotes").select("reference").eq("id", inv.quote_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
 
   return {
     invoice: inv,
     balance,
     items: (items ?? []) as Tables<"invoice_items">[],
     payments: (payments ?? []) as Tables<"payments">[],
-    creditNote,
+    creditNote: creditNote as Tables<"credit_notes"> | null,
+    quoteReference: sourceQuote?.reference ?? null,
     client,
   };
 }
@@ -88,7 +96,7 @@ export function InvoiceDetailPage() {
     return <EmptyState title="Facture introuvable" description={String(query.error ?? "")} />;
   }
 
-  const { invoice, balance, items, payments, creditNote, client } = query.data;
+  const { invoice, balance, items, payments, creditNote, quoteReference, client } = query.data;
   const canCancel = isAdmin(role) && invoice.status !== "cancelled" && payments.length === 0;
 
   return (
@@ -113,6 +121,16 @@ export function InvoiceDetailPage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <InvoiceStatusBadge status={balance?.status ?? invoice.status} />
+            <DownloadPdfButton
+              label="Facture PDF"
+              document={invoiceToDocument({ invoice, items, client, payments, quoteReference })}
+            />
+            {creditNote && (
+              <DownloadPdfButton
+                label="Avoir PDF"
+                document={creditNoteToDocument({ creditNote, client, invoiceNumber: invoice.number })}
+              />
+            )}
             <RoleGate permission="payments:write">
               {(balance?.amount_due ?? 0) > 0 && (
                 <Button
