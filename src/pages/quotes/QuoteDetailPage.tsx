@@ -135,36 +135,18 @@ export function QuoteDetailPage() {
 
   const createIntervention = useMutation({
     mutationFn: async () => {
-      if (!quote || !query.data) throw new Error("Devis introuvable");
-      const { data, error } = await supabase
-        .from("interventions")
-        .insert({
-          client_id: quote.client_id,
-          status: "to_plan",
-          service_type: query.data.items[0]?.label ?? "Intervention",
-          description: query.data.items.map((i) => i.label).join(" · "),
-          price_ht: quote.subtotal_ht,
-          notes: quote.notes ? `${quote.notes}\n\nCréée depuis ${quote.reference ?? "devis"}` : `Créée depuis ${quote.reference ?? "devis"}`,
-          created_by: user?.id ?? null,
-        } as never)
-        .select("id")
-        .single();
-      if (error) throw error;
-      if (quote.status !== "accepted") {
-        await supabase.from("quotes").update({ status: "accepted", updated_at: new Date().toISOString() } as never).eq("id", quote.id);
-      }
-      await logActivity({
-        activity_type: "INTERVENTION_CREATED",
-        title: "Intervention créée depuis devis",
-        client_id: quote.client_id,
-        created_by: user?.id,
-        metadata: { intervention_id: data.id, quote_id: quote.id },
+      if (!quote) throw new Error("Devis introuvable");
+      // Intervention (prix HT remisé, adresse, installation) + devis accepté et lié, en une transaction
+      const { data: interventionId, error } = await supabase.rpc("create_intervention_from_quote", {
+        p_quote_id: quote.id,
       });
-      return data.id as string;
+      if (error) throw error;
+      return interventionId;
     },
     onSuccess: async (interventionId) => {
       toast.success("Intervention créée — données du devis reprises");
       await qc.invalidateQueries({ queryKey: ["interventions"] });
+      await qc.invalidateQueries({ queryKey: ["quote", id] });
       navigate(`/interventions/${interventionId}`);
     },
     onError: (e: Error) => toast.error(e.message),

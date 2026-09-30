@@ -52,6 +52,9 @@ export async function createTestDb() {
       email text, phone text, company_name text, contact_name text, city text, message text,
       photos jsonb DEFAULT '[]'::jsonb, priority text, assigned_user uuid, notes text,
       next_action text, next_due_at timestamptz,
+      postal_code text, business_type text, hood_length text, hood_type text, filter_count integer,
+      duct_present boolean, duct_length text, accessibility text, motor_present boolean,
+      night_intervention boolean, schedule_preference text, soil_level text,
       created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now()
     );
     ALTER TABLE public.leads ENABLE ROW LEVEL SECURITY;

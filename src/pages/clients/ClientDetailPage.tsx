@@ -23,6 +23,7 @@ import {
 import { RoleGate } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase/client";
+import { storageFileName } from "@/lib/storage";
 import { logActivity } from "@/lib/activities";
 import {
   ACTIVITY_TYPE_LABELS,
@@ -761,9 +762,10 @@ function PhotosTab({
 
   const remove = useMutation({
     mutationFn: async (photo: Tables<"intervention_photos">) => {
-      await supabase.storage.from(STORAGE_BUCKETS.interventionPhotos).remove([photo.storage_path]);
+      // Ligne d’abord : si la suppression est refusée, le fichier reste consultable
       const { error } = await supabase.from("intervention_photos").delete().eq("id", photo.id);
       if (error) throw error;
+      await supabase.storage.from(STORAGE_BUCKETS.interventionPhotos).remove([photo.storage_path]);
     },
     onSuccess: () => {
       toast.success("Photo supprimée");
@@ -834,7 +836,7 @@ function DocumentsTab({
   const upload = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error("Choisissez un fichier");
-      const path = `${clientId}/${Date.now()}-${file.name}`;
+      const path = `${clientId}/${storageFileName(file.name)}`;
       const { error: upErr } = await supabase.storage
         .from(STORAGE_BUCKETS.clientDocuments)
         .upload(path, file, { upsert: false });
@@ -848,7 +850,10 @@ function DocumentsTab({
         size_bytes: file.size,
         uploaded_by: userId ?? null,
       } as never);
-      if (error) throw error;
+      if (error) {
+        await supabase.storage.from(STORAGE_BUCKETS.clientDocuments).remove([path]);
+        throw error;
+      }
     },
     onSuccess: () => {
       toast.success("Document ajouté");
@@ -872,9 +877,9 @@ function DocumentsTab({
 
   const remove = useMutation({
     mutationFn: async (doc: Tables<"documents">) => {
-      await supabase.storage.from(STORAGE_BUCKETS.clientDocuments).remove([doc.storage_path]);
       const { error } = await supabase.from("documents").delete().eq("id", doc.id);
       if (error) throw error;
+      await supabase.storage.from(STORAGE_BUCKETS.clientDocuments).remove([doc.storage_path]);
     },
     onSuccess: () => {
       toast.success("Document supprimé");

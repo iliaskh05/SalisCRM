@@ -17,6 +17,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { RoleGate } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase/client";
+import { ensureClientAndInstallationFromLead } from "@/lib/quote-requests/from-lead";
 import { logActivity } from "@/lib/activities";
 import { isWebsiteQuoteRequest } from "@/lib/quote-requests/source";
 import {
@@ -125,102 +126,9 @@ export function LeadDetailPage() {
   const convertMutation = useMutation({
     mutationFn: async () => {
       if (!lead) throw new Error("Prospect introuvable");
-      if (lead.converted_client_id) {
-        return lead.converted_client_id;
-      }
-
-      let clientId: string | null = null;
-
-      if (lead.email) {
-        const { data: byEmail } = await supabase
-          .from("clients")
-          .select("id")
-          .ilike("email", lead.email)
-          .maybeSingle();
-        if (byEmail) clientId = byEmail.id;
-      }
-
-      if (!clientId && lead.company_name) {
-        const { data: byCompany } = await supabase
-          .from("clients")
-          .select("id")
-          .ilike("company_name", lead.company_name)
-          .maybeSingle();
-        if (byCompany) clientId = byCompany.id;
-      }
-
-      if (!clientId) {
-        const { data: created, error } = await supabase
-          .from("clients")
-          .insert({
-            company_name: lead.company_name || lead.contact_name || "Client sans nom",
-            contact_name: lead.contact_name,
-            phone: lead.phone,
-            email: lead.email,
-            city: lead.city,
-            postal_code: lead.postal_code,
-            business_type: lead.business_type,
-            lead_id: lead.id,
-            notes: lead.notes,
-            status: "active",
-            created_by: user?.id ?? null,
-          } as never)
-          .select("id")
-          .single();
-        if (error) throw error;
-        clientId = created.id;
-
-        await logActivity({
-          activity_type: "CLIENT_CREATED",
-          title: `Client créé depuis prospect`,
-          client_id: clientId,
-          lead_id: lead.id,
-          created_by: user?.id,
-        });
-
-        // Installation de base si infos hotte présentes
-        if (
-          lead.hood_length ||
-          lead.filter_count ||
-          lead.duct_present != null ||
-          lead.motor_present != null
-        ) {
-          await supabase.from("client_installations").insert({
-            client_id: clientId,
-            label: "Installation principale",
-            hood_length: lead.hood_length,
-            hood_type: lead.hood_type,
-            filter_count: lead.filter_count,
-            duct_present: lead.duct_present,
-            duct_length: lead.duct_length,
-            motor_present: lead.motor_present,
-            night_intervention: lead.night_intervention,
-            schedule_preference: lead.schedule_preference,
-            soil_level: lead.soil_level,
-          } as never);
-        }
-      }
-
-      const { error: leadErr } = await supabase
-        .from("leads")
-        .update({
-          converted_client_id: clientId,
-          status: "won",
-          updated_at: new Date().toISOString(),
-        } as never)
-        .eq("id", lead.id);
-      if (leadErr) throw leadErr;
-
-      await logActivity({
-        activity_type: "LEAD_CONVERTED",
-        title: "Prospect converti en client",
-        client_id: clientId,
-        lead_id: lead.id,
-        created_by: user?.id,
-        metadata: { client_id: clientId },
-      });
-
-      return clientId!;
+      // Idempotent : réutilise le client déjà lié et passe la demande en « gagnée »
+      const { clientId } = await ensureClientAndInstallationFromLead(lead, { markWon: true });
+      return clientId;
     },
     onSuccess: async (clientId) => {
       toast.success("Prospect converti en client");

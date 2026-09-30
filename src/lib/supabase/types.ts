@@ -397,6 +397,25 @@ export type Database = {
         Update: Record<string, unknown>;
         Relationships: [];
       };
+      intervention_reports: {
+        Row: {
+          id: string;
+          intervention_id: string;
+          work_completed: string | null;
+          observations: string | null;
+          difficulties: string | null;
+          recommendations: string | null;
+          checklist: Json;
+          provider_signature: string | null;
+          client_signature: string | null;
+          validated_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       credit_notes: {
         Row: {
           id: string;
@@ -520,6 +539,27 @@ export type Database = {
       revoke_staff_access: {
         Args: { p_user_id: string };
         Returns: undefined;
+      };
+      convert_lead_to_client: {
+        Args: { p_lead_id: string; p_mark_won?: boolean };
+        Returns: { client_id: string; installation_id: string; created: boolean };
+      };
+      create_intervention_from_quote: {
+        Args: { p_quote_id: string };
+        Returns: string;
+      };
+      save_intervention_report: {
+        Args: {
+          p_intervention_id: string;
+          p_work_completed: string | null;
+          p_observations?: string | null;
+          p_difficulties?: string | null;
+          p_recommendations?: string | null;
+          p_provider_signature?: string | null;
+          p_client_signature?: string | null;
+          p_validate?: boolean;
+        };
+        Returns: string;
       };
     };
     Enums: {

@@ -183,8 +183,7 @@ export function PaymentCreatePage() {
         .single();
       if (error) throw error;
 
-      // Refresh invoice payment status if RPC exists
-      await supabase.rpc("refresh_invoice_payment_status", { p_invoice_id: invoiceId });
+      // Contrôle du reste dû et statut de la facture : triggers en base, même transaction
 
       await logActivity({
         activity_type: "PAYMENT_RECEIVED",

@@ -131,7 +131,7 @@ export function QuoteCreatePage() {
     let cancelled = false;
     void (async () => {
       try {
-        const prepared = await ensureClientAndInstallationFromLead(lead, user?.id ?? null);
+        const prepared = await ensureClientAndInstallationFromLead(lead);
         if (cancelled) return;
         setClientId(prepared.clientId);
         if (prepared.installationId) setInstallationId(prepared.installationId);

@@ -18,6 +18,7 @@ import { RoleGate } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { isAdmin } from "@/lib/auth/permissions";
 import { supabase } from "@/lib/supabase/client";
+import { storageFileName } from "@/lib/storage";
 import { logActivity } from "@/lib/activities";
 import {
   INTERVENTION_STATUS_LABELS,
@@ -350,7 +351,7 @@ function PhotosSection({
   const upload = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error("Choisissez une image");
-      const path = `${intervention.client_id}/${intervention.id}/${Date.now()}-${file.name}`;
+      const path = `${intervention.client_id}/${intervention.id}/${storageFileName(file.name)}`;
       const { error: upErr } = await supabase.storage
         .from(STORAGE_BUCKETS.interventionPhotos)
         .upload(path, file, { upsert: false });
@@ -363,7 +364,10 @@ function PhotosSection({
         comment: nullIfEmpty(comment),
         uploaded_by: userId ?? null,
       } as never);
-      if (error) throw error;
+      if (error) {
+        await supabase.storage.from(STORAGE_BUCKETS.interventionPhotos).remove([path]);
+        throw error;
+      }
       await logActivity({
         activity_type: "PHOTO_UPLOADED",
         title: `Photo ${PHOTO_KIND_LABELS[kind]} ajoutée`,
@@ -383,9 +387,10 @@ function PhotosSection({
 
   const remove = useMutation({
     mutationFn: async (photo: Tables<"intervention_photos">) => {
-      await supabase.storage.from(STORAGE_BUCKETS.interventionPhotos).remove([photo.storage_path]);
+      // Ligne d’abord : si la suppression est refusée, le fichier reste consultable
       const { error } = await supabase.from("intervention_photos").delete().eq("id", photo.id);
       if (error) throw error;
+      await supabase.storage.from(STORAGE_BUCKETS.interventionPhotos).remove([photo.storage_path]);
     },
     onSuccess: () => {
       toast.success("Photo supprimée");
