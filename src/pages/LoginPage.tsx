@@ -10,13 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export function LoginPage() {
-  const { signIn, isAuthenticated, isStaff, loading } = useAuth();
+  const { signIn, verifyMfa, signOut, session, needsMfa, isAuthenticated, isStaff, loading } = useAuth();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from ?? "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [code, setCode] = useState("");
 
   if (!loading && isAuthenticated && isStaff) {
     return <Navigate to={from} replace />;
@@ -31,11 +32,29 @@ export function LoginPage() {
     }
 
     setSubmitting(true);
-    const { error } = await signIn(parsed.data.email, parsed.data.password);
+    const result = await signIn(parsed.data.email, parsed.data.password);
+    const { error } = result;
     setSubmitting(false);
 
     if (error) {
       toast.error("Connexion impossible", { description: error });
+      return;
+    }
+    if (!result.mfaRequired) toast.success("Bienvenue sur SalisCRM");
+  }
+
+  async function onVerify(e: React.FormEvent) {
+    e.preventDefault();
+    if (!/^\d{6}$/.test(code.trim())) {
+      toast.error("Saisissez le code à 6 chiffres de votre application d’authentification.");
+      return;
+    }
+    setSubmitting(true);
+    const { error } = await verifyMfa(code);
+    setSubmitting(false);
+    if (error) {
+      toast.error("Vérification impossible", { description: error });
+      setCode("");
       return;
     }
     toast.success("Bienvenue sur SalisCRM");
@@ -52,6 +71,37 @@ export function LoginPage() {
           </p>
         </div>
 
+        {session && needsMfa ? (
+          <form onSubmit={onVerify} className="space-y-4" noValidate>
+            <p className="text-sm text-muted-foreground">
+              Double authentification : saisissez le code à 6 chiffres affiché par votre application
+              d’authentification.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="mfa-code">Code de vérification</Label>
+              <Input
+                id="mfa-code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                autoFocus
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                placeholder="123456"
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting ? "Vérification…" : "Valider"}
+            </Button>
+            <button
+              type="button"
+              className="w-full text-center text-xs text-muted-foreground hover:underline"
+              onClick={() => void signOut()}
+            >
+              Annuler et changer de compte
+            </button>
+          </form>
+        ) : (
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -80,6 +130,7 @@ export function LoginPage() {
             {submitting ? "Connexion…" : "Se connecter"}
           </Button>
         </form>
+        )}
         <div className="mt-5 flex flex-col gap-2 text-sm">
           <button
             type="button"

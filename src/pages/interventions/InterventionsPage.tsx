@@ -68,7 +68,7 @@ export function InterventionsPage() {
         title="Interventions"
         description="Planification et suivi des interventions terrain."
         actions={
-          <RoleGate permission="interventions:write">
+          <RoleGate permission="interventions:create">
             <Button variant="accent" onClick={() => navigate("/interventions/nouvelle")}>
               <Plus className="size-4" />
               Nouvelle intervention

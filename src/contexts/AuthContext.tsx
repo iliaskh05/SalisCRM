@@ -22,7 +22,10 @@ type AuthState = {
   loading: boolean;
   isAuthenticated: boolean;
   isStaff: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  /** Mot de passe validé mais code de double authentification encore attendu */
+  needsMfa: boolean;
+  signIn: (email: string, password: string) => Promise<{ error: string | null; mfaRequired?: boolean }>;
+  verifyMfa: (code: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   hasPermission: (permission: Permission) => boolean;
@@ -44,10 +47,28 @@ async function fetchStaffProfile(userId: string): Promise<StaffProfile | null> {
   return data;
 }
 
+/**
+ * Vrai si le compte a activé la double authentification mais que la session n'a pas encore
+ * passé le code (niveau aal1 au lieu de aal2). En cas d'erreur on répond "non" : ce n'est
+ * qu'un confort d'affichage, la base refuse de toute façon toute donnée à une session aal1
+ * d'un compte protégé (fonction mfa_satisfied).
+ */
+async function fetchNeedsMfa(): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (error || !data) return false;
+    return data.nextLevel === "aal2" && data.currentLevel !== "aal2";
+  } catch {
+    // Jeton illisible : ne jamais bloquer l’écran sur « Chargement… » (la base reste le garde-fou)
+    return false;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<StaffProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsMfa, setNeedsMfa] = useState(false);
 
   const refreshProfile = useCallback(async () => {
     const {
@@ -70,6 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.session?.user) {
         const p = await fetchStaffProfile(data.session.user.id);
         if (mounted) setProfile(p);
+        const mfa = await fetchNeedsMfa();
+        if (mounted) setNeedsMfa(mfa);
       }
       if (mounted) setLoading(false);
     });
@@ -78,14 +101,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(nextSession);
       if (!nextSession?.user) {
         setProfile(null);
+        setNeedsMfa(false);
         setLoading(false);
         return;
       }
       // Évite le deadlock potentiel avec Supabase auth callbacks
       void Promise.resolve().then(async () => {
         const p = await fetchStaffProfile(nextSession.user.id);
+        const mfa = await fetchNeedsMfa();
         if (mounted) {
           setProfile(p);
+          setNeedsMfa(mfa);
           setLoading(false);
         }
       });
@@ -113,6 +139,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
     }
+    const mfaRequired = await fetchNeedsMfa();
+    setNeedsMfa(mfaRequired);
+    return { error: null, mfaRequired };
+  }, []);
+
+  const verifyMfa = useCallback(async (code: string) => {
+    const { data: factors, error: listError } = await supabase.auth.mfa.listFactors();
+    if (listError) return { error: listError.message };
+    const factor = factors?.totp?.[0];
+    if (!factor) return { error: "Aucun appareil d’authentification n’est enregistré pour ce compte." };
+
+    const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: factor.id, code: code.trim() });
+    if (error) return { error: "Code incorrect ou expiré. Vérifiez l’heure de votre téléphone et réessayez." };
+    setNeedsMfa(await fetchNeedsMfa());
     return { error: null };
   }, []);
 
@@ -120,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setSession(null);
     setProfile(null);
+    setNeedsMfa(false);
   }, []);
 
   const role = profile?.role ?? null;
@@ -131,14 +172,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       role,
       loading,
-      isAuthenticated: Boolean(session?.user),
+      needsMfa,
+      // Tant que le code n'est pas saisi, la session ne donne accès à rien
+      isAuthenticated: Boolean(session?.user) && !needsMfa,
       isStaff: Boolean(profile),
       signIn,
+      verifyMfa,
       signOut,
       refreshProfile,
       hasPermission: (permission) => can(role, permission),
     }),
-    [session, profile, role, loading, signIn, signOut, refreshProfile],
+    [session, profile, role, loading, needsMfa, signIn, verifyMfa, signOut, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

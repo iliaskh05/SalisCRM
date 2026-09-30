@@ -540,6 +540,22 @@ export type Database = {
         Args: { p_user_id: string };
         Returns: undefined;
       };
+      export_client_data: {
+        Args: { p_client_id: string };
+        Returns: Json;
+      };
+      anonymize_client: {
+        Args: { p_client_id: string; p_reason: string; p_include_company?: boolean };
+        Returns: {
+          client_id: string;
+          leads_anonymized: number;
+          documents_to_review: { id: string; title: string; doc_type: string }[];
+        };
+      };
+      purge_expired_leads: {
+        Args: { p_months?: number; p_dry_run?: boolean };
+        Returns: Json;
+      };
       convert_lead_to_client: {
         Args: { p_lead_id: string; p_mark_won?: boolean };
         Returns: { client_id: string; installation_id: string; created: boolean };

@@ -24,6 +24,7 @@ import { RoleGate } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase/client";
 import { storageFileName } from "@/lib/storage";
+import { ClientPrivacyActions } from "@/components/clients/ClientPrivacyActions";
 import { logActivity } from "@/lib/activities";
 import {
   ACTIVITY_TYPE_LABELS,
@@ -149,7 +150,7 @@ export function ClientDetailPage() {
                 Devis
               </Button>
             </RoleGate>
-            <RoleGate permission="interventions:write">
+            <RoleGate permission="interventions:create">
               <Button
                 variant="outline"
                 size="sm"
@@ -178,6 +179,9 @@ export function ClientDetailPage() {
                 <Wallet className="size-3.5" />
                 Paiement
               </Button>
+            </RoleGate>
+            <RoleGate permission="users:manage">
+              <ClientPrivacyActions clientId={client.id} reference={client.reference} hasInvoices={data.invoices.length > 0} />
             </RoleGate>
           </div>
         }

@@ -10,6 +10,7 @@ import { getSupabaseConfigStatus } from "@/lib/supabase/client";
 import { SetupPage } from "@/pages/SetupPage";
 import { LoginPage } from "@/pages/LoginPage";
 const SetPasswordPage = lazy(() => import("@/pages/SetPasswordPage").then((m) => ({ default: m.SetPasswordPage })));
+const AccountSecurityPage = lazy(() => import("@/pages/AccountSecurityPage").then((m) => ({ default: m.AccountSecurityPage })));
 const NotFoundPage = lazy(() => import("@/pages/NotFoundPage").then((m) => ({ default: m.NotFoundPage })));
 const UnauthorizedPage = lazy(() => import("@/pages/UnauthorizedPage").then((m) => ({ default: m.UnauthorizedPage })));
 const CommercialsPage = lazy(() => import("@/pages/commercials/CommercialsPage").then((m) => ({ default: m.CommercialsPage })));
@@ -106,7 +107,7 @@ export default function App() {
                   <Route path="clients/:id" element={<ClientDetailPage />} />
                 </Route>
 
-                <Route element={<ProtectedRoute permission="interventions:write" />}>
+                <Route element={<ProtectedRoute permission="interventions:create" />}>
                   <Route path="interventions/nouvelle" element={<InterventionCreatePage />} />
                 </Route>
                 <Route element={<ProtectedRoute permission="interventions:read" />}>
@@ -148,6 +149,7 @@ export default function App() {
                 <Route element={<ProtectedRoute permission="dashboard:view" />}>
                   <Route path="chat" element={<ChatPlaceholderPage />} />
                 </Route>
+                <Route path="securite" element={<AccountSecurityPage />} />
                 <Route element={<ProtectedRoute permission="users:manage" />}>
                   <Route path="settings" element={<SettingsPage />} />
                 </Route>

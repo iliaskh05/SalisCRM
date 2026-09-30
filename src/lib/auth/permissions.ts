@@ -21,6 +21,7 @@ export type Permission =
   | "installations:write"
   | "interventions:read"
   | "interventions:write"
+  | "interventions:create"
   | "photos:read"
   | "photos:write"
   | "quotes:read"
@@ -50,6 +51,7 @@ const ADMIN_PERMISSIONS: Permission[] = [
   "installations:write",
   "interventions:read",
   "interventions:write",
+  "interventions:create",
   "photos:read",
   "photos:write",
   "quotes:read",
@@ -78,6 +80,7 @@ const COMMERCIAL_PERMISSIONS: Permission[] = [
   "installations:write",
   "interventions:read",
   "interventions:write",
+  "interventions:create",
   "photos:read",
   "photos:write",
   "quotes:read",

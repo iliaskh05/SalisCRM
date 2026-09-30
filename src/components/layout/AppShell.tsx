@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   Shield,
+  ShieldCheck,
   X,
   CalendarDays,
   MessageSquare,
@@ -90,10 +91,17 @@ function SidebarFooter() {
         <span>{role ? ROLE_LABELS[role] : "—"}</span>
       </div>
       <p className="mt-1 truncate">{profile?.display_name ?? user?.email}</p>
+      <Link
+        to="/securite"
+        className="mt-3 flex h-8 w-full items-center gap-2 rounded-lg px-3 text-xs font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-white"
+      >
+        <ShieldCheck className="size-3.5" />
+        Sécurité du compte
+      </Link>
       <Button
         variant="ghost"
         size="sm"
-        className="mt-3 w-full justify-start text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-white"
+        className="mt-1 w-full justify-start text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-white"
         onClick={() => void signOut()}
       >
         <LogOut className="size-3.5" />

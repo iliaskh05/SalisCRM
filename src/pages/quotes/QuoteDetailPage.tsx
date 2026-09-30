@@ -6,6 +6,7 @@ import { ArrowLeft, Printer, Receipt, Send, Wrench } from "lucide-react";
 import { QuotePreview, printElement } from "@/components/quotes/QuotePreview";
 import { SendQuoteDialog } from "@/components/quotes/SendQuoteDialog";
 import { DownloadPdfButton } from "@/components/pdf/DownloadPdfButton";
+import { getEmailProvider } from "@/lib/email/outbound";
 import { quoteToDocument } from "@/lib/pdf/document-model";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -206,7 +207,7 @@ export function QuoteDetailPage() {
             <DownloadPdfButton
               document={quoteToDocument({ quote: loaded, items: query.data.items, client })}
             />
-            <RoleGate permission="interventions:write">
+            <RoleGate permission="interventions:create">
               {quote!.status === "accepted" ? (
                 <Button size="sm" variant="accent" disabled={createIntervention.isPending} onClick={() => createIntervention.mutate()}>
                   <Wrench className="size-3.5" />Créer l’intervention
@@ -282,7 +283,11 @@ export function QuoteDetailPage() {
                 </Button>
               </div>
             </RoleGate>
-            <p className="text-xs text-muted-foreground">Envoi e-mail : prêt à connecter — aucune transmission réelle.</p>
+            <p className="text-xs text-muted-foreground">
+              {getEmailProvider() === "resend"
+                ? "Envoi e-mail configuré : le PDF part en pièce jointe."
+                : "Envoi e-mail non configuré : transmettez le PDF vous-même, puis marquez le devis comme envoyé."}
+            </p>
           </CardContent>
         </Card>
       </div>

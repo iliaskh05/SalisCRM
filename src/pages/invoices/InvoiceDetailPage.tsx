@@ -164,7 +164,7 @@ export function InvoiceDetailPage() {
       )}
 
       <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-        Facturation électronique 2026 : PDF lisible + couche structurée (Factur-X / UBL / CII) <b>prête pour transmission</b>. Aucune PDP n’est connectée — aucune transmission n’est prétendue réussie.
+        Facturation électronique : le PDF est généré, mais le format structuré (Factur-X) n’est <b>pas encore produit</b> et aucune plateforme agréée (PDP) n’est connectée. Cette facture n’a donc pas été transmise par voie électronique réglementaire.
       </div>
 
       <div className="mb-4 grid gap-3 sm:grid-cols-3">

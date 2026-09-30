@@ -58,12 +58,27 @@ Activation :
 
 Tant que `VITE_EMAIL_PROVIDER` est vide, le dialogue propose uniquement « Marquer comme envoyé manuellement » (le PDF se télécharge et se transmet à la main).
 
+## Double authentification (MFA)
+
+Chaque utilisateur peut l'activer depuis **Sécurité du compte** (menu latéral) avec une application d'authentification (Google Authenticator, Authy, 1Password…). Elle est **appliquée par la base** : dès qu'un compte l'a activée, ses droits d'accès (fonction `mfa_satisfied`) sont nuls tant que la session n'a pas passé le code. Un mot de passe volé ne donne donc accès à aucune donnée.
+
+- **Téléphone perdu** : dans le tableau de bord Supabase → Authentication → Users → l'utilisateur → supprimer le facteur MFA. L'utilisateur se reconnecte avec son mot de passe seul.
+- **Dernier admin verrouillé** : même procédure (dashboard), ou SQL : `DELETE FROM auth.mfa_factors WHERE user_id = '<uuid>';`.
+- Non obligatoire pour l'instant : à activer d'abord pour la direction.
+
+## RGPD
+
+Outils pour la direction (voir `docs/RGPD.md`, registre des traitements à valider) :
+
+- fiche client → **Exporter les données** (JSON) et **Anonymiser** (les factures restent 10 ans) ;
+- Paramètres → **Conservation des données** : purge des demandes anciennes jamais converties, avec simulation préalable. La purge est **manuelle** : rien n'est supprimé automatiquement.
+
 ## Base de données
 
 Les migrations sont dans `supabase/migrations/`, toutes rejouables sans effet de bord. La première (`baseline_shared_objects`) recrée `leads`, `staff_profiles` et le bucket `lead-documents`, mais ne modifie rien s'ils existent déjà (cas de la production).
 
 ```bash
-npm run test:db   # joue toutes les migrations sur un Postgres embarqué + 129 contrôles
+npm run test:db   # joue toutes les migrations sur un Postgres embarqué + 169 contrôles
 ```
 
 À lancer avant chaque migration. La CI le fait aussi sur chaque pull request.
@@ -89,6 +104,7 @@ Ordre recommandé : **staging → vérification manuelle → production**.
 - [ ] Authentication → Password : 10 caractères minimum, minuscules + majuscules + chiffres, protection contre les mots de passe fuités.
 - [ ] Authentication → URL Configuration : Site URL = URL de production ; Redirect URLs = `https://<domaine>/definir-mot-de-passe`.
 - [ ] Authentication → Emails : SMTP personnalisé (l'envoi par défaut de Supabase est limité à quelques e-mails par heure).
+- [ ] Authentication → Multi-Factor : **TOTP activé** (sinon la page « Sécurité du compte » ne peut pas enregistrer d’appareil).
 - [ ] Edge Function `invite-staff` déployée.
 
 ### Premier compte direction
