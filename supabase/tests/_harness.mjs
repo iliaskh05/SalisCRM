@@ -1,6 +1,6 @@
 // Harnais commun aux tests de migrations : Postgres embarqué (PGlite) + stubs des
-// objets Supabase / pro-extract-hub absents du repo (auth, rôles API, storage,
-// realtime, leads, staff_profiles). Toutes les migrations du dossier sont jouées.
+// objets fournis par la plateforme Supabase (auth, rôles API, storage, realtime).
+// Toutes les migrations du dossier sont jouées, socle leads / staff_profiles compris.
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -41,24 +41,6 @@ export async function createTestDb() {
     GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated;
 
     CREATE PUBLICATION supabase_realtime;
-
-    -- État de pro-extract-hub : enum SANS 'prestataire' (ajouté par la migration phase1)
-    CREATE TYPE public.staff_role AS ENUM ('admin', 'commercial');
-    CREATE TABLE public.staff_profiles (
-      user_id uuid PRIMARY KEY, role public.staff_role NOT NULL, display_name text, created_at timestamptz DEFAULT now()
-    );
-    CREATE TABLE public.leads (
-      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), status text DEFAULT 'new', source text DEFAULT 'website_form',
-      email text, phone text, company_name text, contact_name text, city text, message text,
-      photos jsonb DEFAULT '[]'::jsonb, priority text, assigned_user uuid, notes text,
-      next_action text, next_due_at timestamptz,
-      postal_code text, business_type text, hood_length text, hood_type text, filter_count integer,
-      duct_present boolean, duct_length text, accessibility text, motor_present boolean,
-      night_intervention boolean, schedule_preference text, soil_level text,
-      created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now()
-    );
-    ALTER TABLE public.leads ENABLE ROW LEVEL SECURITY;
-    CREATE POLICY "Anyone can submit a lead" ON public.leads FOR INSERT TO anon WITH CHECK (true);
   `);
 
   for (const f of readdirSync(MIG).filter((f) => f.endsWith(".sql")).sort()) {
