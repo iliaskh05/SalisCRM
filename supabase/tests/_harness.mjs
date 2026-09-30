@@ -28,7 +28,13 @@ export async function createTestDb() {
     );
     CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE
       AS $$ SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+    CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE
+      AS $$ SELECT COALESCE(NULLIF(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
+    CREATE TABLE auth.mfa_factors (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid, status text, factor_type text DEFAULT 'totp'
+    );
     GRANT USAGE ON SCHEMA public, auth TO anon, authenticated, service_role;
+    GRANT EXECUTE ON FUNCTION auth.jwt() TO anon, authenticated;
     GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated;
     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
@@ -67,8 +73,10 @@ export async function createTestDb() {
   let pass = 0;
   let fail = 0;
 
-  async function as(role, uid, sql, params) {
+  // Session par défaut : mot de passe seul (aal1). claims = { aal: "aal2" } simule une session avec code MFA.
+  async function as(role, uid, sql, params, claims = { aal: "aal1" }) {
     await db.exec(`RESET ROLE; SELECT set_config('request.jwt.claim.sub', '${uid ?? ""}', false);`);
+    await db.query("SELECT set_config('request.jwt.claims', $1, false)", [JSON.stringify(claims)]);
     if (role) await db.exec(`SET ROLE ${role}`);
     try {
       return await db.query(sql, params);
