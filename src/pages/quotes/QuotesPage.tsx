@@ -11,7 +11,9 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { QuoteStatusBadge } from "@/components/ui/status-badge";
 import { TableShell, Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { RoleGate } from "@/components/auth/ProtectedRoute";
+import { Pager, usePagination } from "@/components/ui/pager";
 import { supabase } from "@/lib/supabase/client";
+import { selectAll } from "@/lib/supabase/select-all";
 import { QUOTE_STATUS_LABELS } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { QuoteStatus, Tables } from "@/lib/supabase/types";
@@ -20,8 +22,8 @@ type Row = Tables<"quotes"> & { client_name?: string };
 
 async function fetchQuotes(): Promise<Row[]> {
   const [{ data, error }, { data: clients }] = await Promise.all([
-    supabase.from("quotes").select("*").order("created_at", { ascending: false }),
-    supabase.from("clients").select("id, company_name"),
+    selectAll((from, to) => supabase.from("quotes").select("*").order("created_at", { ascending: false }).order("id").range(from, to)),
+    selectAll((from, to) => supabase.from("clients").select("id, company_name").order("id").range(from, to)),
   ]);
   if (error) throw error;
   const map = new Map((clients ?? []).map((c) => [c.id, c.company_name]));
@@ -42,6 +44,7 @@ export function QuotesPage() {
       return [row.reference, row.client_name].filter(Boolean).join(" ").toLowerCase().includes(q);
     });
   }, [data, search, status]);
+  const pager = usePagination(filtered);
 
   if (isLoading) return <LoadingState />;
   if (error) return <EmptyState title="Erreur" description={String(error)} />;
@@ -79,38 +82,41 @@ export function QuotesPage() {
       {filtered.length === 0 ? (
         <EmptyState title="Aucun devis" />
       ) : (
-        <TableShell>
-          <Table>
-            <THead>
-              <TR>
-                <TH>Référence</TH>
-                <TH>Client</TH>
-                <TH>Émis</TH>
-                <TH>Validité</TH>
-                <TH>Total TTC</TH>
-                <TH>Statut</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {filtered.map((q) => (
-                <TR key={q.id}>
-                  <TD>
-                    <Link to={`/devis/${q.id}`} className="font-medium text-accent hover:underline">
-                      {q.reference ?? q.id.slice(0, 8)}
-                    </Link>
-                  </TD>
-                  <TD>{q.client_name ?? "—"}</TD>
-                  <TD>{formatDate(q.issued_at)}</TD>
-                  <TD>{formatDate(q.valid_until)}</TD>
-                  <TD>{formatCurrency(q.total_ttc)}</TD>
-                  <TD>
-                    <QuoteStatusBadge status={q.status} />
-                  </TD>
+        <>
+          <TableShell>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Référence</TH>
+                  <TH>Client</TH>
+                  <TH>Émis</TH>
+                  <TH>Validité</TH>
+                  <TH>Total TTC</TH>
+                  <TH>Statut</TH>
                 </TR>
-              ))}
-            </TBody>
-          </Table>
-        </TableShell>
+              </THead>
+              <TBody>
+                {pager.pageItems.map((q) => (
+                  <TR key={q.id}>
+                    <TD>
+                      <Link to={`/devis/${q.id}`} className="font-medium text-accent hover:underline">
+                        {q.reference ?? q.id.slice(0, 8)}
+                      </Link>
+                    </TD>
+                    <TD>{q.client_name ?? "—"}</TD>
+                    <TD>{formatDate(q.issued_at)}</TD>
+                    <TD>{formatDate(q.valid_until)}</TD>
+                    <TD>{formatCurrency(q.total_ttc)}</TD>
+                    <TD>
+                      <QuoteStatusBadge status={q.status} />
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </TableShell>
+          <Pager pager={pager} />
+        </>
       )}
     </div>
   );

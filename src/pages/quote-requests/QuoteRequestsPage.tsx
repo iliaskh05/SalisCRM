@@ -9,14 +9,18 @@ import { LoadingState } from "@/components/ui/loading-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { TableShell, Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
+import { Pager, usePagination } from "@/components/ui/pager";
 import { supabase } from "@/lib/supabase/client";
+import { selectAll } from "@/lib/supabase/select-all";
 import { isWebsiteQuoteRequest, sourceLabel } from "@/lib/quote-requests/source";
 import { REQUEST_STATUS_LABELS, REQUEST_STATUSES, businessTypeLabel, URGENCY_LABELS } from "@/lib/quote-requests/status";
 import { formatDateTime } from "@/lib/format";
 import type { LeadStatus, Tables } from "@/lib/supabase/types";
 
 async function fetchRequests() {
-  const { data, error } = await supabase.from("leads").select("*").order("created_at", { ascending: false });
+  const { data, error } = await selectAll((from, to) =>
+    supabase.from("leads").select("*").order("created_at", { ascending: false }).order("id").range(from, to),
+  );
   if (error) throw error;
   return ((data ?? []) as Tables<"leads">[]).filter((lead) => isWebsiteQuoteRequest(lead));
 }
@@ -55,6 +59,7 @@ export function QuoteRequestsPage() {
       return [l.company_name, l.contact_name, l.email, l.city, l.reference].filter(Boolean).join(" ").toLowerCase().includes(q);
     });
   }, [data, search, status, city]);
+  const pager = usePagination(filtered);
 
   const inbox = data.filter((l) => l.status === "new").length;
 
@@ -96,44 +101,47 @@ export function QuoteRequestsPage() {
       {filtered.length === 0 ? (
         <EmptyState title="Aucune demande site" description="Les soumissions du formulaire public apparaissent ici en temps réel." />
       ) : (
-        <TableShell>
-          <Table>
-            <THead>
-              <TR>
-                <TH>Demande</TH>
-                <TH>Établissement</TH>
-                <TH>Ville</TH>
-                <TH>Urgence</TH>
-                <TH>Statut</TH>
-                <TH>Reçue</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {filtered.map((lead) => (
-                <TR key={lead.id}>
-                  <TD>
-                    <Link to={`/demandes-devis/${lead.id}`} className="font-medium text-accent hover:underline">
-                      {lead.company_name || lead.contact_name || lead.reference || "Demande"}
-                    </Link>
-                    <div className="text-xs text-muted-foreground">{sourceLabel(lead.source, lead.landing_page)}</div>
-                  </TD>
-                  <TD>
-                    {businessTypeLabel(lead.business_type)}
-                    <div className="text-xs text-muted-foreground">{lead.contact_name}</div>
-                  </TD>
-                  <TD>
-                    {[lead.postal_code, lead.city].filter(Boolean).join(" ") || "—"}
-                  </TD>
-                  <TD>{lead.urgency_level ? URGENCY_LABELS[lead.urgency_level] ?? lead.urgency_level : "—"}</TD>
-                  <TD>
-                    <RequestBadge status={lead.status} />
-                  </TD>
-                  <TD>{formatDateTime(lead.created_at)}</TD>
+        <>
+          <TableShell>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Demande</TH>
+                  <TH>Établissement</TH>
+                  <TH>Ville</TH>
+                  <TH>Urgence</TH>
+                  <TH>Statut</TH>
+                  <TH>Reçue</TH>
                 </TR>
-              ))}
-            </TBody>
-          </Table>
-        </TableShell>
+              </THead>
+              <TBody>
+                {pager.pageItems.map((lead) => (
+                  <TR key={lead.id}>
+                    <TD>
+                      <Link to={`/demandes-devis/${lead.id}`} className="font-medium text-accent hover:underline">
+                        {lead.company_name || lead.contact_name || lead.reference || "Demande"}
+                      </Link>
+                      <div className="text-xs text-muted-foreground">{sourceLabel(lead.source, lead.landing_page)}</div>
+                    </TD>
+                    <TD>
+                      {businessTypeLabel(lead.business_type)}
+                      <div className="text-xs text-muted-foreground">{lead.contact_name}</div>
+                    </TD>
+                    <TD>
+                      {[lead.postal_code, lead.city].filter(Boolean).join(" ") || "—"}
+                    </TD>
+                    <TD>{lead.urgency_level ? URGENCY_LABELS[lead.urgency_level] ?? lead.urgency_level : "—"}</TD>
+                    <TD>
+                      <RequestBadge status={lead.status} />
+                    </TD>
+                    <TD>{formatDateTime(lead.created_at)}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </TableShell>
+          <Pager pager={pager} />
+        </>
       )}
     </div>
   );

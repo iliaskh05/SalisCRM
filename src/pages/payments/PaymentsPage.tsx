@@ -15,7 +15,9 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { TableShell, Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { RoleGate } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
+import { Pager, usePagination } from "@/components/ui/pager";
 import { supabase } from "@/lib/supabase/client";
+import { selectAll } from "@/lib/supabase/select-all";
 import { logActivity } from "@/lib/activities";
 import { PAYMENT_METHOD_LABELS } from "@/lib/constants";
 import { formatCurrency, formatDate, nullIfEmpty, todayISO } from "@/lib/format";
@@ -25,9 +27,9 @@ type Row = Tables<"payments"> & { client_name?: string; invoice_number?: string 
 
 async function fetchPayments(): Promise<Row[]> {
   const [{ data, error }, { data: clients }, { data: invoices }] = await Promise.all([
-    supabase.from("payments").select("*").order("paid_at", { ascending: false }),
-    supabase.from("clients").select("id, company_name"),
-    supabase.from("invoices").select("id, number"),
+    selectAll((from, to) => supabase.from("payments").select("*").order("paid_at", { ascending: false }).order("id").range(from, to)),
+    selectAll((from, to) => supabase.from("clients").select("id, company_name").order("id").range(from, to)),
+    selectAll((from, to) => supabase.from("invoices").select("id, number").order("id").range(from, to)),
   ]);
   if (error) throw error;
   const cMap = new Map((clients ?? []).map((c) => [c.id, c.company_name]));
@@ -51,6 +53,7 @@ export function PaymentsPage() {
       [p.client_name, p.invoice_number, p.reference, p.method].filter(Boolean).join(" ").toLowerCase().includes(q),
     );
   }, [data, search]);
+  const pager = usePagination(filtered);
 
   if (isLoading) return <LoadingState />;
   if (error) return <EmptyState title="Erreur" description={String(error)} />;
@@ -80,40 +83,43 @@ export function PaymentsPage() {
       {filtered.length === 0 ? (
         <EmptyState title="Aucun paiement" />
       ) : (
-        <TableShell>
-          <Table>
-            <THead>
-              <TR>
-                <TH>Date</TH>
-                <TH>Client</TH>
-                <TH>Facture</TH>
-                <TH>Montant</TH>
-                <TH>Méthode</TH>
-                <TH>Référence</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {filtered.map((p) => (
-                <TR key={p.id}>
-                  <TD>{formatDate(p.paid_at)}</TD>
-                  <TD>
-                    <Link to={`/clients/${p.client_id}`} className="hover:underline">
-                      {p.client_name ?? "—"}
-                    </Link>
-                  </TD>
-                  <TD>
-                    <Link to={`/factures/${p.invoice_id}`} className="text-accent hover:underline">
-                      {p.invoice_number ?? p.invoice_id.slice(0, 8)}
-                    </Link>
-                  </TD>
-                  <TD className="font-medium">{formatCurrency(p.amount)}</TD>
-                  <TD>{PAYMENT_METHOD_LABELS[p.method]}</TD>
-                  <TD>{p.reference || "—"}</TD>
+        <>
+          <TableShell>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Date</TH>
+                  <TH>Client</TH>
+                  <TH>Facture</TH>
+                  <TH>Montant</TH>
+                  <TH>Méthode</TH>
+                  <TH>Référence</TH>
                 </TR>
-              ))}
-            </TBody>
-          </Table>
-        </TableShell>
+              </THead>
+              <TBody>
+                {pager.pageItems.map((p) => (
+                  <TR key={p.id}>
+                    <TD>{formatDate(p.paid_at)}</TD>
+                    <TD>
+                      <Link to={`/clients/${p.client_id}`} className="hover:underline">
+                        {p.client_name ?? "—"}
+                      </Link>
+                    </TD>
+                    <TD>
+                      <Link to={`/factures/${p.invoice_id}`} className="text-accent hover:underline">
+                        {p.invoice_number ?? p.invoice_id.slice(0, 8)}
+                      </Link>
+                    </TD>
+                    <TD className="font-medium">{formatCurrency(p.amount)}</TD>
+                    <TD>{PAYMENT_METHOD_LABELS[p.method]}</TD>
+                    <TD>{p.reference || "—"}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </TableShell>
+          <Pager pager={pager} />
+        </>
       )}
     </div>
   );

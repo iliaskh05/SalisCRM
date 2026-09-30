@@ -11,7 +11,9 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { InvoiceStatusBadge } from "@/components/ui/status-badge";
 import { TableShell, Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { RoleGate } from "@/components/auth/ProtectedRoute";
+import { Pager, usePagination } from "@/components/ui/pager";
 import { supabase } from "@/lib/supabase/client";
+import { selectAll } from "@/lib/supabase/select-all";
 import { INVOICE_STATUS_LABELS } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { InvoiceStatus } from "@/lib/supabase/types";
@@ -31,8 +33,8 @@ type Row = {
 
 async function fetchInvoices(): Promise<Row[]> {
   const [{ data, error }, { data: clients }] = await Promise.all([
-    supabase.from("invoice_balances").select("*").order("issued_at", { ascending: false }),
-    supabase.from("clients").select("id, company_name"),
+    selectAll((from, to) => supabase.from("invoice_balances").select("*").order("issued_at", { ascending: false }).order("invoice_id").range(from, to)),
+    selectAll((from, to) => supabase.from("clients").select("id, company_name").order("id").range(from, to)),
   ]);
   if (error) throw error;
   const map = new Map((clients ?? []).map((c) => [c.id, c.company_name]));
@@ -64,6 +66,7 @@ export function InvoicesPage() {
       return [row.number, row.client_name].filter(Boolean).join(" ").toLowerCase().includes(q);
     });
   }, [data, search, status]);
+  const pager = usePagination(filtered);
 
   if (isLoading) return <LoadingState />;
   if (error) return <EmptyState title="Erreur" description={String(error)} />;
@@ -101,42 +104,45 @@ export function InvoicesPage() {
       {filtered.length === 0 ? (
         <EmptyState title="Aucune facture" />
       ) : (
-        <TableShell>
-          <Table>
-            <THead>
-              <TR>
-                <TH>Numéro</TH>
-                <TH>Client</TH>
-                <TH>Émise</TH>
-                <TH>Échéance</TH>
-                <TH>TTC</TH>
-                <TH>Payé</TH>
-                <TH>Dû</TH>
-                <TH>Statut</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {filtered.map((inv) => (
-                <TR key={inv.invoice_id}>
-                  <TD>
-                    <Link to={`/factures/${inv.invoice_id}`} className="font-medium text-accent hover:underline">
-                      {inv.number ?? inv.invoice_id.slice(0, 8)}
-                    </Link>
-                  </TD>
-                  <TD>{inv.client_name ?? "—"}</TD>
-                  <TD>{formatDate(inv.issued_at)}</TD>
-                  <TD>{formatDate(inv.due_at)}</TD>
-                  <TD>{formatCurrency(inv.total_ttc)}</TD>
-                  <TD>{formatCurrency(inv.amount_paid)}</TD>
-                  <TD>{formatCurrency(inv.amount_due)}</TD>
-                  <TD>
-                    <InvoiceStatusBadge status={inv.status} />
-                  </TD>
+        <>
+          <TableShell>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Numéro</TH>
+                  <TH>Client</TH>
+                  <TH>Émise</TH>
+                  <TH>Échéance</TH>
+                  <TH>TTC</TH>
+                  <TH>Payé</TH>
+                  <TH>Dû</TH>
+                  <TH>Statut</TH>
                 </TR>
-              ))}
-            </TBody>
-          </Table>
-        </TableShell>
+              </THead>
+              <TBody>
+                {pager.pageItems.map((inv) => (
+                  <TR key={inv.invoice_id}>
+                    <TD>
+                      <Link to={`/factures/${inv.invoice_id}`} className="font-medium text-accent hover:underline">
+                        {inv.number ?? inv.invoice_id.slice(0, 8)}
+                      </Link>
+                    </TD>
+                    <TD>{inv.client_name ?? "—"}</TD>
+                    <TD>{formatDate(inv.issued_at)}</TD>
+                    <TD>{formatDate(inv.due_at)}</TD>
+                    <TD>{formatCurrency(inv.total_ttc)}</TD>
+                    <TD>{formatCurrency(inv.amount_paid)}</TD>
+                    <TD>{formatCurrency(inv.amount_due)}</TD>
+                    <TD>
+                      <InvoiceStatusBadge status={inv.status} />
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </TableShell>
+          <Pager pager={pager} />
+        </>
       )}
     </div>
   );

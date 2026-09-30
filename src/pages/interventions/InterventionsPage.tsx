@@ -11,7 +11,9 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { InterventionStatusBadge } from "@/components/ui/status-badge";
 import { TableShell, Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { RoleGate } from "@/components/auth/ProtectedRoute";
+import { Pager, usePagination } from "@/components/ui/pager";
 import { supabase } from "@/lib/supabase/client";
+import { selectAll } from "@/lib/supabase/select-all";
 import { INTERVENTION_STATUS_LABELS } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { InterventionStatus, Tables } from "@/lib/supabase/types";
@@ -20,8 +22,8 @@ type Row = Tables<"interventions"> & { client_name?: string; provider_name?: str
 
 async function fetchInterventions(): Promise<Row[]> {
   const [{ data, error }, { data: clients }, { data: providers }] = await Promise.all([
-    supabase.from("interventions").select("*").order("scheduled_date", { ascending: false }),
-    supabase.from("clients").select("id, company_name"),
+    selectAll((from, to) => supabase.from("interventions").select("*").order("scheduled_date", { ascending: false }).order("id").range(from, to)),
+    selectAll((from, to) => supabase.from("clients").select("id, company_name").order("id").range(from, to)),
     supabase.from("providers").select("id, name"),
   ]);
   if (error) throw error;
@@ -55,6 +57,7 @@ export function InterventionsPage() {
         .includes(q);
     });
   }, [data, search, status]);
+  const pager = usePagination(filtered);
 
   if (isLoading) return <LoadingState />;
   if (error) return <EmptyState title="Erreur" description={String(error)} />;
@@ -92,42 +95,45 @@ export function InterventionsPage() {
       {filtered.length === 0 ? (
         <EmptyState title="Aucune intervention" />
       ) : (
-        <TableShell>
-          <Table>
-            <THead>
-              <TR>
-                <TH>Référence</TH>
-                <TH>Client</TH>
-                <TH>Date</TH>
-                <TH>Créneau</TH>
-                <TH>Prestataire</TH>
-                <TH>Service</TH>
-                <TH>Prix HT</TH>
-                <TH>Statut</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {filtered.map((i) => (
-                <TR key={i.id}>
-                  <TD>
-                    <Link to={`/interventions/${i.id}`} className="font-medium text-accent hover:underline">
-                      {i.reference ?? i.id.slice(0, 8)}
-                    </Link>
-                  </TD>
-                  <TD>{i.client_name ?? "—"}</TD>
-                  <TD>{formatDate(i.scheduled_date)}</TD>
-                  <TD>{i.time_slot || "—"}</TD>
-                  <TD>{i.provider_name || "—"}</TD>
-                  <TD>{i.service_type || "—"}</TD>
-                  <TD>{formatCurrency(i.price_ht)}</TD>
-                  <TD>
-                    <InterventionStatusBadge status={i.status} />
-                  </TD>
+        <>
+          <TableShell>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Référence</TH>
+                  <TH>Client</TH>
+                  <TH>Date</TH>
+                  <TH>Créneau</TH>
+                  <TH>Prestataire</TH>
+                  <TH>Service</TH>
+                  <TH>Prix HT</TH>
+                  <TH>Statut</TH>
                 </TR>
-              ))}
-            </TBody>
-          </Table>
-        </TableShell>
+              </THead>
+              <TBody>
+                {pager.pageItems.map((i) => (
+                  <TR key={i.id}>
+                    <TD>
+                      <Link to={`/interventions/${i.id}`} className="font-medium text-accent hover:underline">
+                        {i.reference ?? i.id.slice(0, 8)}
+                      </Link>
+                    </TD>
+                    <TD>{i.client_name ?? "—"}</TD>
+                    <TD>{formatDate(i.scheduled_date)}</TD>
+                    <TD>{i.time_slot || "—"}</TD>
+                    <TD>{i.provider_name || "—"}</TD>
+                    <TD>{i.service_type || "—"}</TD>
+                    <TD>{formatCurrency(i.price_ht)}</TD>
+                    <TD>
+                      <InterventionStatusBadge status={i.status} />
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </TableShell>
+          <Pager pager={pager} />
+        </>
       )}
     </div>
   );

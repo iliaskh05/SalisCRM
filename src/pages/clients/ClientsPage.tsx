@@ -11,7 +11,9 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ClientStatusBadge } from "@/components/ui/status-badge";
 import { TableShell, Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { RoleGate } from "@/components/auth/ProtectedRoute";
+import { Pager, usePagination } from "@/components/ui/pager";
 import { supabase } from "@/lib/supabase/client";
+import { selectAll } from "@/lib/supabase/select-all";
 import { CLIENT_STATUS_LABELS } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { ClientStatus, Tables } from "@/lib/supabase/types";
@@ -28,8 +30,8 @@ type ClientRow = Tables<"clients"> & {
 
 async function fetchClients(): Promise<ClientRow[]> {
   const [{ data: clients, error }, { data: summaries }] = await Promise.all([
-    supabase.from("clients").select("*").order("created_at", { ascending: false }),
-    supabase.from("client_financial_summary").select("*"),
+    selectAll((from, to) => supabase.from("clients").select("*").order("created_at", { ascending: false }).order("id").range(from, to)),
+    selectAll((from, to) => supabase.from("client_financial_summary").select("*").order("client_id").range(from, to)),
   ]);
   if (error) throw error;
   const map = new Map((summaries ?? []).map((s) => [s.client_id, s]));
@@ -65,6 +67,7 @@ export function ClientsPage() {
       return hay.includes(q);
     });
   }, [data, search, status]);
+  const pager = usePagination(filtered);
 
   if (isLoading) return <LoadingState label="Chargement des clients…" />;
   if (error) return <EmptyState title="Erreur" description={String(error)} />;
@@ -107,50 +110,53 @@ export function ClientsPage() {
       {filtered.length === 0 ? (
         <EmptyState title="Aucun client" />
       ) : (
-        <TableShell>
-          <Table>
-            <THead>
-              <TR>
-                <TH>Référence</TH>
-                <TH>Société</TH>
-                <TH>Contact</TH>
-                <TH>Ville</TH>
-                <TH>Activité</TH>
-                <TH>Dernière / Prochaine</TH>
-                <TH>Facturé</TH>
-                <TH>Dû</TH>
-                <TH>Statut</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {filtered.map((c) => (
-                <TR key={c.id}>
-                  <TD>
-                    <Link to={`/clients/${c.id}`} className="font-medium text-accent hover:underline">
-                      {c.reference ?? c.id.slice(0, 8)}
-                    </Link>
-                  </TD>
-                  <TD className="font-medium">{c.company_name}</TD>
-                  <TD>
-                    <div>{c.contact_name || "—"}</div>
-                    <div className="text-xs text-muted-foreground">{c.phone || c.email || ""}</div>
-                  </TD>
-                  <TD>{c.city || "—"}</TD>
-                  <TD>{c.business_type || "—"}</TD>
-                  <TD className="text-xs">
-                    <div>Dernière : {formatDate(c.financial?.last_intervention_at)}</div>
-                    <div>Prochaine : {formatDate(c.financial?.next_intervention_at)}</div>
-                  </TD>
-                  <TD>{formatCurrency(c.financial?.total_invoiced)}</TD>
-                  <TD>{formatCurrency(c.financial?.amount_due)}</TD>
-                  <TD>
-                    <ClientStatusBadge status={c.status} />
-                  </TD>
+        <>
+          <TableShell>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Référence</TH>
+                  <TH>Société</TH>
+                  <TH>Contact</TH>
+                  <TH>Ville</TH>
+                  <TH>Activité</TH>
+                  <TH>Dernière / Prochaine</TH>
+                  <TH>Facturé</TH>
+                  <TH>Dû</TH>
+                  <TH>Statut</TH>
                 </TR>
-              ))}
-            </TBody>
-          </Table>
-        </TableShell>
+              </THead>
+              <TBody>
+                {pager.pageItems.map((c) => (
+                  <TR key={c.id}>
+                    <TD>
+                      <Link to={`/clients/${c.id}`} className="font-medium text-accent hover:underline">
+                        {c.reference ?? c.id.slice(0, 8)}
+                      </Link>
+                    </TD>
+                    <TD className="font-medium">{c.company_name}</TD>
+                    <TD>
+                      <div>{c.contact_name || "—"}</div>
+                      <div className="text-xs text-muted-foreground">{c.phone || c.email || ""}</div>
+                    </TD>
+                    <TD>{c.city || "—"}</TD>
+                    <TD>{c.business_type || "—"}</TD>
+                    <TD className="text-xs">
+                      <div>Dernière : {formatDate(c.financial?.last_intervention_at)}</div>
+                      <div>Prochaine : {formatDate(c.financial?.next_intervention_at)}</div>
+                    </TD>
+                    <TD>{formatCurrency(c.financial?.total_invoiced)}</TD>
+                    <TD>{formatCurrency(c.financial?.amount_due)}</TD>
+                    <TD>
+                      <ClientStatusBadge status={c.status} />
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </TableShell>
+          <Pager pager={pager} />
+        </>
       )}
     </div>
   );

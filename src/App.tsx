@@ -1,37 +1,44 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
+import { LoadingState } from "@/components/ui/loading-state";
 import { getSupabaseConfigStatus } from "@/lib/supabase/client";
 import { SetupPage } from "@/pages/SetupPage";
 import { LoginPage } from "@/pages/LoginPage";
-import { SetPasswordPage } from "@/pages/SetPasswordPage";
-import { UnauthorizedPage } from "@/pages/UnauthorizedPage";
-import { CommercialsPage } from "@/pages/commercials/CommercialsPage";
-import { DashboardPage } from "@/pages/DashboardPage";
-import { AgendaPage } from "@/pages/AgendaPage";
-import { CatalogPage, ChatPlaceholderPage, InterventionReportPage, SettingsPage } from "@/pages/ops/ExtraPages";
-import { LeadsPage } from "@/pages/leads/LeadsPage";
-import { LeadDetailPage } from "@/pages/leads/LeadDetailPage";
-import { QuoteRequestsPage } from "@/pages/quote-requests/QuoteRequestsPage";
-import { QuoteRequestDetailPage } from "@/pages/quote-requests/QuoteRequestDetailPage";
-import { ClientsPage } from "@/pages/clients/ClientsPage";
-import { ClientCreatePage } from "@/pages/clients/ClientCreatePage";
-import { ClientDetailPage } from "@/pages/clients/ClientDetailPage";
-import { InterventionsPage } from "@/pages/interventions/InterventionsPage";
-import { InterventionCreatePage } from "@/pages/interventions/InterventionCreatePage";
-import { InterventionDetailPage } from "@/pages/interventions/InterventionDetailPage";
-import { QuotesPage } from "@/pages/quotes/QuotesPage";
-import { QuoteCreatePage } from "@/pages/quotes/QuoteCreatePage";
-import { QuoteDetailPage } from "@/pages/quotes/QuoteDetailPage";
-import { InvoicesPage } from "@/pages/invoices/InvoicesPage";
-import { InvoiceCreatePage } from "@/pages/invoices/InvoiceCreatePage";
-import { InvoiceDetailPage } from "@/pages/invoices/InvoiceDetailPage";
-import { PaymentsPage, PaymentCreatePage } from "@/pages/payments/PaymentsPage";
-import { ProvidersPage } from "@/pages/providers/ProvidersPage";
-import { DemoApp } from "@/demo/DemoApp";
+const SetPasswordPage = lazy(() => import("@/pages/SetPasswordPage").then((m) => ({ default: m.SetPasswordPage })));
+const NotFoundPage = lazy(() => import("@/pages/NotFoundPage").then((m) => ({ default: m.NotFoundPage })));
+const UnauthorizedPage = lazy(() => import("@/pages/UnauthorizedPage").then((m) => ({ default: m.UnauthorizedPage })));
+const CommercialsPage = lazy(() => import("@/pages/commercials/CommercialsPage").then((m) => ({ default: m.CommercialsPage })));
+const DashboardPage = lazy(() => import("@/pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
+const AgendaPage = lazy(() => import("@/pages/AgendaPage").then((m) => ({ default: m.AgendaPage })));
+const CatalogPage = lazy(() => import("@/pages/ops/ExtraPages").then((m) => ({ default: m.CatalogPage })));
+const ChatPlaceholderPage = lazy(() => import("@/pages/ops/ExtraPages").then((m) => ({ default: m.ChatPlaceholderPage })));
+const InterventionReportPage = lazy(() => import("@/pages/ops/ExtraPages").then((m) => ({ default: m.InterventionReportPage })));
+const SettingsPage = lazy(() => import("@/pages/ops/ExtraPages").then((m) => ({ default: m.SettingsPage })));
+const LeadsPage = lazy(() => import("@/pages/leads/LeadsPage").then((m) => ({ default: m.LeadsPage })));
+const LeadDetailPage = lazy(() => import("@/pages/leads/LeadDetailPage").then((m) => ({ default: m.LeadDetailPage })));
+const QuoteRequestsPage = lazy(() => import("@/pages/quote-requests/QuoteRequestsPage").then((m) => ({ default: m.QuoteRequestsPage })));
+const QuoteRequestDetailPage = lazy(() => import("@/pages/quote-requests/QuoteRequestDetailPage").then((m) => ({ default: m.QuoteRequestDetailPage })));
+const ClientsPage = lazy(() => import("@/pages/clients/ClientsPage").then((m) => ({ default: m.ClientsPage })));
+const ClientCreatePage = lazy(() => import("@/pages/clients/ClientCreatePage").then((m) => ({ default: m.ClientCreatePage })));
+const ClientDetailPage = lazy(() => import("@/pages/clients/ClientDetailPage").then((m) => ({ default: m.ClientDetailPage })));
+const InterventionsPage = lazy(() => import("@/pages/interventions/InterventionsPage").then((m) => ({ default: m.InterventionsPage })));
+const InterventionCreatePage = lazy(() => import("@/pages/interventions/InterventionCreatePage").then((m) => ({ default: m.InterventionCreatePage })));
+const InterventionDetailPage = lazy(() => import("@/pages/interventions/InterventionDetailPage").then((m) => ({ default: m.InterventionDetailPage })));
+const QuotesPage = lazy(() => import("@/pages/quotes/QuotesPage").then((m) => ({ default: m.QuotesPage })));
+const QuoteCreatePage = lazy(() => import("@/pages/quotes/QuoteCreatePage").then((m) => ({ default: m.QuoteCreatePage })));
+const QuoteDetailPage = lazy(() => import("@/pages/quotes/QuoteDetailPage").then((m) => ({ default: m.QuoteDetailPage })));
+const InvoicesPage = lazy(() => import("@/pages/invoices/InvoicesPage").then((m) => ({ default: m.InvoicesPage })));
+const InvoiceCreatePage = lazy(() => import("@/pages/invoices/InvoiceCreatePage").then((m) => ({ default: m.InvoiceCreatePage })));
+const InvoiceDetailPage = lazy(() => import("@/pages/invoices/InvoiceDetailPage").then((m) => ({ default: m.InvoiceDetailPage })));
+const PaymentsPage = lazy(() => import("@/pages/payments/PaymentsPage").then((m) => ({ default: m.PaymentsPage })));
+const PaymentCreatePage = lazy(() => import("@/pages/payments/PaymentsPage").then((m) => ({ default: m.PaymentCreatePage })));
+const ProvidersPage = lazy(() => import("@/pages/providers/ProvidersPage").then((m) => ({ default: m.ProvidersPage })));
+const DemoApp = lazy(() => import("@/demo/DemoApp").then((m) => ({ default: m.DemoApp })));
 import { isDemoMode } from "@/lib/demo/mode";
 
 const queryClient = new QueryClient({
@@ -52,7 +59,11 @@ function HomePage() {
 
 export default function App() {
   if (isDemoMode()) {
-    return <DemoApp />;
+    return (
+      <Suspense fallback={<LoadingState />}>
+        <DemoApp />
+      </Suspense>
+    );
   }
 
   if (!getSupabaseConfigStatus().configured) {
@@ -63,6 +74,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
+          <Suspense fallback={<LoadingState className="min-h-screen" />}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/definir-mot-de-passe" element={<SetPasswordPage />} />
@@ -142,8 +154,9 @@ export default function App() {
               </Route>
             </Route>
 
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
+          </Suspense>
         </BrowserRouter>
         <Toaster richColors position="top-right" closeButton />
       </AuthProvider>

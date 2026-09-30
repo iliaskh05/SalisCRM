@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
 import {
   Inbox,
@@ -25,6 +25,7 @@ import { BrandLogo } from "@/components/brand/BrandLogo";
 import { RoleGate } from "@/components/auth/ProtectedRoute";
 import { ROLE_LABELS, type Permission } from "@/lib/auth/permissions";
 import { Button } from "@/components/ui/button";
+import { LoadingState } from "@/components/ui/loading-state";
 import { useLeadsInboxRealtime } from "@/hooks/useLeadsInboxRealtime";
 import { cn } from "@/lib/utils";
 
@@ -167,7 +168,9 @@ export function AppShell() {
           </div>
         </header>
         <main className="flex-1 p-4 md:p-6">
-          <Outlet />
+          <Suspense fallback={<LoadingState />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

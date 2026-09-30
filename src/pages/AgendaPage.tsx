@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { LoadingState } from "@/components/ui/loading-state";
 import { InterventionStatusBadge } from "@/components/ui/status-badge";
 import { supabase } from "@/lib/supabase/client";
+import { selectAll } from "@/lib/supabase/select-all";
 import type { Tables } from "@/lib/supabase/types";
 
 export function AgendaPage() {
@@ -18,8 +19,8 @@ export function AgendaPage() {
     queryKey: ["agenda"],
     queryFn: async () => {
       const [{ data: interventions, error }, { data: clients }] = await Promise.all([
-        supabase.from("interventions").select("*").order("scheduled_date"),
-        supabase.from("clients").select("id, company_name, city"),
+        selectAll((from, to) => supabase.from("interventions").select("*").order("scheduled_date").order("id").range(from, to)),
+        selectAll((from, to) => supabase.from("clients").select("id, company_name, city").order("id").range(from, to)),
       ]);
       if (error) throw error;
       return {
