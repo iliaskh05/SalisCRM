@@ -91,4 +91,37 @@ ok("supprimée : ancienne demande non convertie", (await rows(asSuper(`SELECT 1 
 ok("conservées : avec devis, gagnée, récente", (await rows(asSuper(`SELECT id FROM leads WHERE id = ANY($1)`, [[oldQuoted.id, oldWon.id, recent.id]]))).length === 3);
 ok("e-mail de la demande purgée retiré de l'audit", !JSON.stringify(await rows(asSuper(`SELECT changes FROM audit_log WHERE table_name = 'leads'`))).includes("vieux@x.fr"));
 
+console.log("\n# Politique MFA de la direction (interrupteur)");
+const { RANDO } = USERS;
+const aal2 = { aal: "aal2" };
+const asAs = (uid, sql, p, claims) => as("authenticated", uid, sql, p, claims);
+ok("désactivée par défaut", (await one(asAdmin(`SELECT security_policy() AS p`))).p.require_admin_mfa === false);
+await rejects("impossible de l'activer sans avoir soi-même la MFA", () => asAdmin(`SELECT set_require_admin_mfa(true)`), "Activez d");
+await rejects("réservé à la direction", () => asComm(`SELECT set_require_admin_mfa(false)`), "direction");
+
+await db.query(`INSERT INTO auth.mfa_factors (user_id, status) VALUES ($1, 'verified')`, [ADMIN]);
+await rejects("activation depuis une session aal1 refusée", () => asAdmin(`SELECT set_require_admin_mfa(true)`), "direction");
+await asAs(ADMIN, `SELECT set_require_admin_mfa(true)`, [], aal2);
+ok("activée depuis une session aal2", (await one(asAs(ADMIN, `SELECT security_policy() AS p`, [], aal2))).p.require_admin_mfa === true);
+
+await asSuper(`INSERT INTO staff_profiles (user_id, role) VALUES ($1, 'admin')`, [RANDO]);
+ok("administrateur sans MFA : plus aucun droit d'administration", (await one(asAs(RANDO, `SELECT is_admin() AS v`))).v === false);
+ok("… ni accès aux données", (await rows(asAs(RANDO, `SELECT id FROM clients`))).length === 0);
+ok("… mais son profil reste lisible (pour l'écran d'activation)", (await rows(asAs(RANDO, `SELECT role FROM staff_profiles WHERE user_id = $1`, [RANDO]))).length === 1);
+ok("… et la politique lui est lisible (pour savoir quoi faire)", (await one(asAs(RANDO, `SELECT security_policy() AS p`))).p.require_admin_mfa === true);
+ok("commercial non concerné par l'obligation", (await rows(asComm(`SELECT id FROM clients`))).length > 0);
+
+const staff = await rows(asAs(ADMIN, `SELECT user_id, mfa_enabled FROM list_staff_users()`, [], aal2));
+ok("la direction voit qui a activé la MFA", staff.find((s) => s.user_id === ADMIN)?.mfa_enabled === true && staff.find((s) => s.user_id === RANDO)?.mfa_enabled === false);
+
+await db.query(`INSERT INTO auth.mfa_factors (user_id, status) VALUES ($1, 'verified')`, [RANDO]);
+ok("MFA activée mais code pas encore saisi (aal1) : toujours bloqué", (await one(asAs(RANDO, `SELECT is_admin() AS v`))).v === false);
+ok("MFA activée + code saisi (aal2) : accès rétabli", (await one(asAs(RANDO, `SELECT is_admin() AS v`, [], aal2))).v === true);
+
+await db.query(`DELETE FROM auth.mfa_factors WHERE user_id = $1`, [RANDO]);
+await asAs(ADMIN, `SELECT set_require_admin_mfa(false)`, [], aal2);
+ok("désactivée : l'administrateur sans MFA retrouve l'accès", (await one(asAs(RANDO, `SELECT is_admin() AS v`))).v === true);
+ok("les changements de politique sont journalisés", (await rows(asAs(ADMIN, `SELECT 1 FROM audit_log WHERE action = 'SETTING'`, [], aal2))).length === 2);
+await db.query(`DELETE FROM auth.mfa_factors`);
+
 done();

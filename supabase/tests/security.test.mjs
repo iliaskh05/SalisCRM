@@ -36,7 +36,7 @@ await rejects("un commercial ne s'auto-promeut pas", async () => {
 }, "RLS");
 
 console.log("\n# Prestataire : lecture");
-const seenInt = await rows(asPresta(`SELECT id FROM interventions`));
+const seenInt = await rows(asPresta(`SELECT id FROM provider_interventions`));
 ok("voit uniquement son intervention", seenInt.length === 1 && seenInt[0].id === i1.id, JSON.stringify(seenInt));
 const seenCli = await rows(asPresta(`SELECT id FROM clients`));
 ok("voit uniquement le client concerné", seenCli.length === 1 && seenCli[0].id === c1.id);
@@ -47,12 +47,17 @@ ok("ne voit pas les leads", (await rows(asPresta(`SELECT id FROM leads`))).lengt
 ok("ne voit que sa fiche prestataire", (await rows(asPresta(`SELECT id FROM providers`))).map((r) => r.id).join() === p1.id);
 
 console.log("\n# Prestataire : écriture");
-await asPresta(`UPDATE interventions SET status = 'in_progress', notes = 'sur place' WHERE id = $1`, [i1.id]);
+await asPresta(`SELECT provider_update_intervention($1, 'in_progress', 'sur place')`, [i1.id]);
 ok("peut démarrer + noter", (await rows(asSuper(`SELECT status, notes FROM interventions WHERE id=$1`, [i1.id])))[0].status === "in_progress");
-await rejects("ne change pas le prix", () => asPresta(`UPDATE interventions SET price_ht = 1 WHERE id = $1`, [i1.id]), "que le statut");
-await rejects("ne se réaffecte pas", () => asPresta(`UPDATE interventions SET provider_id = $2 WHERE id = $1`, [i1.id, p2.id]));
-await rejects("n'annule pas", () => asPresta(`UPDATE interventions SET status = 'cancelled' WHERE id = $1`, [i1.id]), "démarrer ou terminer");
-const other = await asPresta(`UPDATE interventions SET notes = 'pirate' WHERE id = $1`, [i2.id]);
+// Plus aucun accès direct à la table : prix, affectation et statut ne se modifient que via la fonction
+ok("table interventions : 0 ligne lisible en direct", (await rows(asPresta(`SELECT id FROM interventions`))).length === 0);
+ok("la vue ne contient pas le prix", !Object.keys((await rows(asPresta(`SELECT * FROM provider_interventions`)))[0]).some((k) => /price|quote|created_by/.test(k)));
+ok("UPDATE direct du prix : 0 ligne modifiée", (await asPresta(`UPDATE interventions SET price_ht = 1 WHERE id = $1`, [i1.id])).affectedRows === 0);
+ok("UPDATE direct de l'affectation : 0 ligne modifiée", (await asPresta(`UPDATE interventions SET provider_id = $2 WHERE id = $1`, [i1.id, p2.id])).affectedRows === 0);
+ok("le prix est intact", Number((await rows(asSuper(`SELECT price_ht FROM interventions WHERE id=$1`, [i1.id])))[0].price_ht) === 500);
+await rejects("n'annule pas", () => asPresta(`SELECT provider_update_intervention($1, 'cancelled', null)`, [i1.id]), "démarrer ou terminer");
+await rejects("intervention d'un autre : refusée", () => asPresta(`SELECT provider_update_intervention($1, 'in_progress', 'pirate')`, [i2.id]), "Accès refusé");
+const other = { affectedRows: 0 };
 ok("intervention d'un autre : 0 ligne modifiée", other.affectedRows === 0);
 await rejects("ne crée pas d'intervention", () => asPresta(`INSERT INTO interventions (client_id) VALUES ($1)`, [c1.id]), "row-level security");
 await asPresta(`INSERT INTO intervention_photos (intervention_id, client_id, kind, storage_path, uploaded_by) VALUES ($1, $2, 'before', 'x', $3)`, [i1.id, c2.id, PRESTA]);
@@ -62,8 +67,9 @@ await asPresta(`INSERT INTO intervention_reports (intervention_id, work_complete
 ok("rapport sur son intervention", (await rows(asPresta(`SELECT id FROM intervention_reports`))).length === 1);
 await rejects("rapport sur l'intervention d'un autre", () => asPresta(`INSERT INTO intervention_reports (intervention_id) VALUES ($1)`, [i2.id]), "row-level security");
 ok("ne supprime pas un rapport", (await asPresta(`DELETE FROM intervention_reports WHERE intervention_id = $1`, [i1.id])).affectedRows === 0);
-await asPresta(`UPDATE interventions SET status = 'completed' WHERE id = $1`, [i1.id]);
-await rejects("intervention terminée verrouillée pour lui", () => asPresta(`UPDATE interventions SET notes = 'modif' WHERE id = $1`, [i1.id]), "clôturée");
+await asPresta(`SELECT provider_update_intervention($1, 'completed', 'fini')`, [i1.id]);
+ok("terminée : horodatée + activité créée par la fonction", (await rows(asSuper(`SELECT completed_at FROM interventions WHERE id=$1`, [i1.id])))[0].completed_at !== null && (await rows(asSuper(`SELECT 1 FROM activities WHERE activity_type = 'INTERVENTION_COMPLETED' AND client_id = $1`, [c1.id]))).length === 1);
+await rejects("intervention terminée verrouillée pour lui", () => asPresta(`SELECT provider_update_intervention($1, 'completed', 'modif')`, [i1.id]), "clôturée");
 await asComm(`UPDATE interventions SET price_ht = 550 WHERE id = $1`, [i1.id]);
 ok("le commercial garde la main", Number((await rows(asSuper(`SELECT price_ht FROM interventions WHERE id=$1`, [i1.id])))[0].price_ht) === 550);
 
@@ -78,10 +84,10 @@ ok("ne liste que ses fichiers", (await rows(asPresta(`SELECT name FROM storage.o
 
 console.log("\n# Prestataire désactivé");
 await asAdmin(`UPDATE providers SET status = 'inactive' WHERE id = $1`, [p1.id]);
-ok("fiche inactive : plus aucun accès", (await rows(asPresta(`SELECT id FROM interventions`))).length === 0);
+ok("fiche inactive : plus aucun accès", (await rows(asPresta(`SELECT id FROM provider_interventions`))).length === 0);
 await asAdmin(`UPDATE providers SET status = 'active' WHERE id = $1`, [p1.id]);
 await asAdmin(`SELECT revoke_staff_access($1)`, [PRESTA]);
-ok("accès retiré : plus aucun accès", (await rows(asPresta(`SELECT id FROM interventions`))).length === 0);
+ok("accès retiré : plus aucun accès", (await rows(asPresta(`SELECT id FROM provider_interventions`))).length === 0);
 ok("accès retiré : fiche déliée", (await rows(asSuper(`SELECT user_id FROM providers WHERE id=$1`, [p1.id])))[0].user_id === null);
 ok("compte sans profil : rien", (await rows(as("authenticated", RANDO, `SELECT id FROM clients`))).length === 0);
 
