@@ -45,6 +45,19 @@ Il contient les mentions obligatoires d’une facture (numéro, dates, identité
 
 > **À vérifier avant la mise en service** : les informations société de `src/lib/company.ts` (adresse, SIREN/SIRET, TVA, capital, IBAN/BIC) figurent sur chaque document. L’IBAN actuel est un exemple : il ne sera pas imprimé tant qu’il n’est pas remplacé par le vrai.
 
+## Envoi des devis par e-mail
+
+Le bouton « Envoyer le devis » expédie le PDF en pièce jointe via l'Edge Function `send-document-email` (Resend). Le devis ne passe en « envoyé » que si l'e-mail est réellement parti. Garde-fous : réservé aux commerciaux / direction, destinataire = adresse d'un **client enregistré**, pièce jointe limitée à 5 Mo.
+
+Activation :
+
+1. Créer un compte [Resend](https://resend.com) et **vérifier le domaine d'envoi** (enregistrements SPF / DKIM chez le registrar) — sans cela les e-mails partent en spam.
+2. `npx supabase secrets set RESEND_API_KEY=... EMAIL_FROM="Salis 3 Hottes <devis@votre-domaine.fr>" EMAIL_REPLY_TO=contact@votre-domaine.fr`
+3. `npx supabase functions deploy send-document-email`
+4. Définir `VITE_EMAIL_PROVIDER=resend` dans Vercel et redéployer.
+
+Tant que `VITE_EMAIL_PROVIDER` est vide, le dialogue propose uniquement « Marquer comme envoyé manuellement » (le PDF se télécharge et se transmet à la main).
+
 ## Base de données
 
 Les migrations sont dans `supabase/migrations/`, toutes rejouables sans effet de bord. La première (`baseline_shared_objects`) recrée `leads`, `staff_profiles` et le bucket `lead-documents`, mais ne modifie rien s'ils existent déjà (cas de la production).
@@ -117,3 +130,4 @@ Créer un projet Sentry (plateforme React) et renseigner `VITE_SENTRY_DSN`. Sans
 | `npm run typecheck` | vérification TypeScript |
 | `npm run test:db` | migrations + tests base de données |
 | `npm run test:unit` | tests unitaires (génération PDF, ventilation TVA) |
+| `npm run test:functions` | tests des Edge Functions (envoi d'e-mail) |

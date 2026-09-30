@@ -293,7 +293,8 @@ export function QuoteDetailPage() {
         clientName={client?.company_name ?? "Client"}
         reference={quote!.reference ?? quote!.id.slice(0, 8)}
         validUntil={quote!.valid_until}
-        onConfirm={async () => {
+        document={quoteToDocument({ quote: loaded, items, client })}
+        onConfirm={async (delivery) => {
           const { error } = await supabase
             .from("quotes")
             .update({ status: "sent", updated_at: new Date().toISOString() } as never)
@@ -307,11 +308,11 @@ export function QuoteDetailPage() {
           }
           await logActivity({
             activity_type: "QUOTE_SENT",
-            title: "Devis préparé pour envoi",
+            title: delivery === "sent" ? "Devis envoyé par e-mail" : "Devis marqué comme envoyé (transmis manuellement)",
             client_id: quote!.client_id,
             lead_id: quote!.lead_id,
             created_by: user?.id,
-            metadata: { quote_id: quote!.id, delivery: "prepared" },
+            metadata: { quote_id: quote!.id, delivery },
           });
           await qc.invalidateQueries({ queryKey: ["quote", id] });
           await qc.invalidateQueries({ queryKey: ["quotes"] });

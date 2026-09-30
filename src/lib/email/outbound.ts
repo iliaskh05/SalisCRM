@@ -1,7 +1,13 @@
 import { COMPANY } from "@/lib/company";
 import { isDemoMode } from "@/lib/demo/mode";
+import { supabase } from "@/lib/supabase/client";
+import { edgeFunctionError } from "@/lib/supabase/edge";
 
-export type EmailProviderId = "none" | "demo";
+/**
+ * "resend" : envoi réel via l'Edge Function send-document-email (VITE_EMAIL_PROVIDER=resend,
+ * clé et domaine configurés côté Supabase). "none" : aucun envoi possible. "demo" : simulation.
+ */
+export type EmailProviderId = "none" | "demo" | "resend";
 
 export type PreparedEmail = {
   to: string;
@@ -10,19 +16,9 @@ export type PreparedEmail = {
   from: string;
 };
 
-export type EmailDispatchResult = {
-  delivered: false;
-  provider: EmailProviderId;
-  mode: "demo" | "ready";
-  title: string;
-  description: string;
-};
-
 export function getEmailProvider(): EmailProviderId {
   if (isDemoMode()) return "demo";
-  const configured = import.meta.env.VITE_EMAIL_PROVIDER?.trim();
-  if (!configured || configured === "none") return "none";
-  return "none";
+  return import.meta.env.VITE_EMAIL_PROVIDER?.trim() === "resend" ? "resend" : "none";
 }
 
 export function prepareQuoteEmail(input: {
@@ -52,24 +48,25 @@ export function prepareQuoteEmail(input: {
   };
 }
 
-export function dispatchPreparedEmail(_email: PreparedEmail): EmailDispatchResult {
-  const provider = getEmailProvider();
-  if (provider === "demo") {
-    return {
-      delivered: false,
-      provider,
-      mode: "demo",
-      title: "Email de démonstration préparé",
-      description:
-        "Aucun serveur SMTP n’est connecté. Le devis est marqué envoyé dans le CRM, sans transmission réelle.",
-    };
-  }
-  return {
-    delivered: false,
-    provider: "none",
-    mode: "ready",
-    title: "Devis prêt à envoyer",
-    description:
-      "Aucun fournisseur e-mail n’est configuré. Le statut peut passer à « envoyé » côté CRM ; la transmission SMTP reste à brancher.",
-  };
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Envoie l'e-mail avec le PDF en pièce jointe. Lève une erreur si l'envoi échoue. */
+export async function sendEmailWithPdf(email: PreparedEmail, pdf: Blob, filename: string): Promise<void> {
+  const { error } = await supabase.functions.invoke("send-document-email", {
+    body: {
+      to: email.to,
+      subject: email.subject,
+      text: email.body,
+      filename,
+      pdf_base64: await blobToBase64(pdf),
+    },
+  });
+  if (error) throw new Error(await edgeFunctionError(error));
 }

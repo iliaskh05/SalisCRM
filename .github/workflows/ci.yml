@@ -37,5 +37,8 @@ jobs:
       - name: Tests unitaires (PDF, calculs)
         run: npm run test:unit
 
+      - name: Tests des Edge Functions (Node)
+        run: npm run test:functions
+
       - name: Migrations + tests (Postgres embarqué)
         run: npm run test:db

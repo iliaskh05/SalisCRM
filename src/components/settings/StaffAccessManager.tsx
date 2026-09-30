@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ROLE_LABELS, STAFF_ROLES } from "@/lib/auth/permissions";
 import { formatDateTime } from "@/lib/format";
 import { supabase } from "@/lib/supabase/client";
+import { edgeFunctionError } from "@/lib/supabase/edge";
 import type { Database, StaffRole } from "@/lib/supabase/types";
 
 type StaffUser = Database["public"]["Functions"]["list_staff_users"]["Returns"][number];
@@ -30,19 +31,6 @@ type InviteForm = {
 };
 
 const emptyForm: InviteForm = { userId: null, email: "", displayName: "", role: "commercial", providerId: "" };
-
-async function edgeFunctionError(error: unknown): Promise<string> {
-  const context = (error as { context?: Response }).context;
-  if (context && typeof context.json === "function") {
-    try {
-      const body = (await context.json()) as { error?: string };
-      if (body.error) return body.error;
-    } catch {
-      // réponse non JSON : message générique ci-dessous
-    }
-  }
-  return error instanceof Error ? error.message : "Opération impossible";
-}
 
 export function StaffAccessManager() {
   const qc = useQueryClient();

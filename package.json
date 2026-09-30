@@ -10,7 +10,8 @@
     "lint": "tsc -b --pretty false",
     "typecheck": "tsc -b --pretty false",
     "test:db": "node supabase/tests/invoicing-integrity.test.mjs && node supabase/tests/security.test.mjs && node supabase/tests/operations.test.mjs",
-    "test:unit": "node --test src/lib/pdf/pdf.test.ts"
+    "test:unit": "node --test src/lib/pdf/pdf.test.ts",
+    "test:functions": "node --test supabase/tests/send-document-email.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

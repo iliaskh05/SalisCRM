@@ -5,8 +5,36 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { dispatchPreparedEmail, prepareQuoteEmail } from "@/lib/email/outbound";
+import { getEmailProvider, prepareQuoteEmail, sendEmailWithPdf } from "@/lib/email/outbound";
 import { formatDate } from "@/lib/format";
+import { documentFileName, type BillingDocument } from "@/lib/pdf/document-model";
+
+/** sent = e-mail réellement parti ; manual = transmis par un autre moyen ; demo = simulation */
+export type QuoteDelivery = "sent" | "manual" | "demo";
+
+const MODE = {
+  resend: {
+    tone: "border-teal-200 bg-teal-50 text-teal-950",
+    title: "Envoi par e-mail",
+    text: "Le devis part à l’adresse ci-dessous avec son PDF en pièce jointe. Il passe en « envoyé » uniquement si l’e-mail a bien été expédié.",
+    action: "Envoyer le devis",
+    busy: "Envoi…",
+  },
+  none: {
+    tone: "border-amber-200 bg-amber-50 text-amber-950",
+    title: "Envoi e-mail non configuré",
+    text: "Aucun e-mail ne partira d’ici. Téléchargez le PDF et transmettez-le vous-même, puis marquez le devis comme envoyé.",
+    action: "Marquer comme envoyé manuellement",
+    busy: "Enregistrement…",
+  },
+  demo: {
+    tone: "border-amber-200 bg-amber-50 text-amber-950",
+    title: "Mode démonstration",
+    text: "Aucun e-mail n’est envoyé : le devis est seulement marqué comme envoyé.",
+    action: "Simuler l’envoi",
+    busy: "Préparation…",
+  },
+} as const;
 
 export function SendQuoteDialog({
   open,
@@ -15,6 +43,7 @@ export function SendQuoteDialog({
   clientName,
   reference,
   validUntil,
+  document,
   onConfirm,
 }: {
   open: boolean;
@@ -23,31 +52,49 @@ export function SendQuoteDialog({
   clientName: string;
   reference: string;
   validUntil?: string | null;
-  onConfirm: () => Promise<void> | void;
+  /** Données du PDF joint (requis pour l'envoi réel) */
+  document?: BillingDocument;
+  onConfirm: (delivery: QuoteDelivery) => Promise<void> | void;
 }) {
+  const provider = getEmailProvider();
+  const mode = MODE[provider];
   const prepared = useMemo(
     () => prepareQuoteEmail({ to, clientName, reference, validUntil: validUntil ? formatDate(validUntil) : null }),
     [to, clientName, reference, validUntil],
   );
-  const preview = dispatchPreparedEmail(prepared);
   const [busy, setBusy] = useState(false);
+  const canSend = provider !== "resend" || (Boolean(prepared.to) && Boolean(document));
+
+  async function confirm() {
+    setBusy(true);
+    try {
+      if (provider === "resend") {
+        if (!document) throw new Error("Document indisponible.");
+        const { buildDocumentPdf } = await import("@/lib/pdf/download");
+        await sendEmailWithPdf(prepared, await buildDocumentPdf(document), documentFileName(document));
+      }
+      await onConfirm(provider === "resend" ? "sent" : provider === "demo" ? "demo" : "manual");
+      toast.success(provider === "resend" ? `Devis envoyé à ${prepared.to}` : "Devis marqué comme envoyé");
+      onClose();
+    } catch (e) {
+      toast.error(provider === "resend" ? "E-mail non envoyé" : "Enregistrement impossible", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title="Envoyer le devis"
-      description="Préparation d’un e-mail professionnel. La transmission SMTP n’est connectée que si un fournisseur est configuré."
-      wide
-    >
-      <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-        <p className="font-semibold">{preview.title}</p>
-        <p className="mt-1">{preview.description}</p>
+    <Dialog open={open} onClose={onClose} title="Envoyer le devis" wide>
+      <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${mode.tone}`}>
+        <p className="font-semibold">{mode.title}</p>
+        <p className="mt-1">{mode.text}</p>
       </div>
       <div className="space-y-3">
         <div>
           <Label>Destinataire</Label>
-          <Input value={prepared.to || "Adresse manquante"} readOnly />
+          <Input value={prepared.to || "Adresse e-mail du client manquante"} readOnly />
         </div>
         <div>
           <Label>Objet</Label>
@@ -62,23 +109,8 @@ export function SendQuoteDialog({
         <Button variant="outline" onClick={onClose}>
           Annuler
         </Button>
-        <Button
-          variant="accent"
-          disabled={busy || !prepared.to}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              await onConfirm();
-              toast.message(preview.title, { description: preview.description });
-              onClose();
-            } catch (e) {
-              toast.error(e instanceof Error ? e.message : "Envoi impossible");
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          {busy ? "Préparation…" : preview.mode === "demo" ? "Préparer l’e-mail de démo" : "Marquer prêt / envoyé"}
+        <Button variant="accent" disabled={busy || !canSend} onClick={() => void confirm()}>
+          {busy ? mode.busy : mode.action}
         </Button>
       </div>
     </Dialog>
