@@ -41,6 +41,18 @@ export async function fetchInterventions(
   );
 }
 
+export async function fetchClientInterventions(role: StaffRole | null, clientId: string): Promise<Result<Intervention[]>> {
+  if (role === "prestataire") {
+    const { data, error } = await supabase
+      .from("provider_interventions")
+      .select("*")
+      .eq("client_id", clientId)
+      .order("scheduled_date", { ascending: false });
+    return { data: data ? data.map(fromProviderView) : null, error };
+  }
+  return supabase.from("interventions").select("*").eq("client_id", clientId).order("scheduled_date", { ascending: false });
+}
+
 export async function fetchInterventionById(role: StaffRole | null, id: string): Promise<Result<Intervention>> {
   if (role === "prestataire") {
     const { data, error } = await supabase.from("provider_interventions").select("*").eq("id", id).single();

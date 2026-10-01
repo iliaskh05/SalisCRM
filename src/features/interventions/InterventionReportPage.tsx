@@ -1,11 +1,7 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
-import { BrandLogo } from "@/components/brand/BrandLogo";
-import { StaffAccessManager } from "@/components/settings/StaffAccessManager";
-import { RetentionManager } from "@/components/settings/RetentionManager";
-import { SecurityPolicyCard } from "@/components/settings/SecurityPolicyCard";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -140,66 +136,6 @@ export function InterventionReportPage() {
           )}
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-export function CatalogPage() {
-  const query = useQuery({
-    queryKey: ["service-catalog"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("service_catalog").select("*").order("label");
-      if (error) throw error;
-      return (data ?? []) as Tables<"service_catalog">[];
-    },
-  });
-  if (query.isLoading) return <LoadingState />;
-  return (
-    <div>
-      <PageHeader title="Catalogue prestations" />
-      <Card>
-        <CardContent className="divide-y p-0">
-          {(query.data ?? []).map((s) => (
-            <div key={s.id} className="flex justify-between px-5 py-3 text-sm">
-              <span>{s.label}</span>
-              <span>{s.unit_price_ht} € HT / {s.unit}</span>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-export function SettingsPage() {
-  return (
-    <div>
-      <PageHeader title="Paramètres" description="Accès de l’équipe, identité société et catalogue." />
-      <StaffAccessManager />
-      <div className="mt-4">
-        <SecurityPolicyCard />
-      </div>
-      <div className="mt-4">
-        <RetentionManager />
-      </div>
-      <Card className="mt-4">
-        <CardContent className="space-y-3 pt-5 text-sm">
-          <BrandLogo size="md" />
-          <p>Salis 3 Hottes · 12 rue de la Fontaine, 75011 Paris</p>
-          <p>SIREN 848 392 017 · SIRET 848 392 017 00017 · TVA FR48 848392017</p>
-          <p>Facturation électronique : les factures et avoirs se téléchargent au format Factur-X. Aucune plateforme agréée (PDP) n’est connectée : la transmission reste à votre charge.</p>
-          <Link to="/produits" className="text-teal-700">Ouvrir le catalogue</Link>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-export function ChatPlaceholderPage() {
-  return (
-    <div>
-      <PageHeader title="Messages" description="Messagerie interne temps réel : prête à connecter (Supabase Realtime)." />
-      <EmptyState title="Aucun canal connecté" description="En mode démonstration, ouvrez l’application avec VITE_DEMO_MODE=true pour la messagerie interactive." />
     </div>
   );
 }

@@ -19,7 +19,7 @@ import { supabase } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, todayISO, startOfMonthISO, endOfMonthISO } from "@/lib/format";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/constants";
 import { aggregateCommercialStats } from "@/lib/quotes/commercial-stats";
-import { CommercialPerformance } from "@/components/dashboard/CommercialPerformance";
+import { CommercialPerformance } from "@/features/dashboard/CommercialPerformance";
 import type { Tables } from "@/lib/supabase/types";
 
 type Kpi = { label: string; value: string; icon: typeof Users; to?: string };

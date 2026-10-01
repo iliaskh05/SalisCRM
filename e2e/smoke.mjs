@@ -310,6 +310,40 @@ try {
     await page.context().close();
   }
 
+  console.log("\n# Fiche client : prestataire et direction");
+  {
+    const { page, errors } = await newPage({ role: "prestataire" });
+    tableLog.length = 0;
+    await page.goto(`${BASE}/clients/c-00000?tab=factures`); // onglet financier demandé dans l'URL
+    await page.getByRole("button", { name: "Vue générale", exact: true }).waitFor({ timeout: 15000 });
+    for (const visible of ["Vue générale", "Installation", "Interventions", "Photos"]) {
+      ok(`prestataire : onglet « ${visible} » présent`, (await page.getByRole("button", { name: visible, exact: true }).count()) === 1);
+    }
+    for (const hidden of ["Devis", "Factures", "Paiements", "Documents", "Historique"]) {
+      ok(`prestataire : onglet « ${hidden} » absent`, (await page.getByRole("button", { name: hidden, exact: true }).count()) === 0);
+    }
+    ok("prestataire : pas de synthèse financière", (await page.getByText("Synthèse financière").count()) === 0);
+    const activeClass = (await page.getByRole("button", { name: "Vue générale", exact: true }).getAttribute("class")) ?? "";
+    ok("prestataire : onglet interdit demandé dans l'URL → retour à la vue générale", activeClass.includes("border-accent"), activeClass);
+    const forbidden = ["quotes", "invoice_balances", "payments", "documents", "activities", "client_financial_summary", "interventions"];
+    ok("prestataire : aucune requête financière ni sur la table interventions", !forbidden.some((t) => tableLog.includes(t)), tableLog.join(","));
+    ok("prestataire : ses interventions via la vue sans prix", tableLog.includes("provider_interventions"));
+    ok("aucune erreur JS", errors.length === 0, errors.join(" | "));
+    await page.context().close();
+  }
+  {
+    const { page } = await newPage({ role: "admin" });
+    tableLog.length = 0;
+    await page.goto(`${BASE}/clients/c-00000`);
+    await page.getByRole("button", { name: "Vue générale", exact: true }).waitFor({ timeout: 15000 });
+    for (const t of ["Vue générale", "Installation", "Interventions", "Photos", "Devis", "Factures", "Paiements", "Documents", "Historique"]) {
+      ok(`direction : onglet « ${t} » présent`, (await page.getByRole("button", { name: t, exact: true }).count()) >= 1);
+    }
+    ok("direction : synthèse financière affichée", await page.getByText("Synthèse financière").isVisible());
+    ok("direction : actions RGPD disponibles", await page.getByRole("button", { name: /Exporter les données/ }).isVisible());
+    await page.context().close();
+  }
+
   console.log("\n# Double authentification obligatoire pour la direction");
   {
     const { page, errors } = await newPage({ role: "admin", requireMfa: true, factors: [] });

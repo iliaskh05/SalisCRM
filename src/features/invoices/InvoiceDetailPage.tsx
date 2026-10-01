@@ -16,7 +16,7 @@ import { TableShell, Table, THead, TBody, TR, TH, TD } from "@/components/ui/tab
 import { RoleGate } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { isAdmin } from "@/lib/auth/permissions";
-import { DownloadPdfButton } from "@/components/pdf/DownloadPdfButton";
+import { DownloadPdfButton } from "@/features/documents/DownloadPdfButton";
 import { creditNoteToDocument, invoiceToDocument } from "@/lib/pdf/document-model";
 import { supabase } from "@/lib/supabase/client";
 import { PAYMENT_METHOD_LABELS } from "@/lib/constants";

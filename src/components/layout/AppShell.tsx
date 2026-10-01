@@ -27,7 +27,7 @@ import { RoleGate } from "@/components/auth/ProtectedRoute";
 import { ROLE_LABELS, type Permission } from "@/lib/auth/permissions";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/loading-state";
-import { useLeadsInboxRealtime } from "@/hooks/useLeadsInboxRealtime";
+import { useLeadsInboxRealtime } from "@/features/leads/useLeadsInboxRealtime";
 import { cn } from "@/lib/utils";
 
 type NavItem = {

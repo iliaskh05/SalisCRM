@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/page-header";
 import { LoadingState } from "@/components/ui/loading-state";
 import { EmptyState } from "@/components/ui/empty-state";
-import { CommercialClosesView } from "@/components/commercials/CommercialClosesView";
+import { CommercialClosesView } from "@/features/commercials/CommercialClosesView";
 import { supabase } from "@/lib/supabase/client";
 import { aggregateCommercialStats, isClosedQuote } from "@/lib/quotes/commercial-stats";
 

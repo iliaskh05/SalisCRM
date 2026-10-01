@@ -18,6 +18,26 @@ npm run dev                  # http://localhost:5174
 
 Sans Supabase, `VITE_DEMO_MODE=true` lance une démo complète avec des données fictives. Le build refuse ce mode quand `VITE_APP_ENV=production`.
 
+## Structure du code
+
+```
+src/
+  features/<domaine>/   pages et composants propres à un domaine métier :
+                        clients (fiche découpée par onglet dans detail/), quotes, invoices, payments,
+                        interventions, leads, quote-requests, providers, commercials, dashboard,
+                        agenda, catalog, chat, settings, auth, documents, app
+  components/ui/        briques d'interface réutilisables (design system)
+  components/           layout (cadre de l'application), auth (garde de routes), brand, media
+  lib/                  logique sans interface : supabase (client, types générés), pdf, facturx,
+                        quotes (calculs), auth (permissions), interventions, email, storage…
+  contexts/             AuthContext (session, rôle, double authentification)
+  demo/                 mode démonstration (chargé à la demande)
+supabase/               migrations, Edge Functions, tests de base de données
+scripts/  e2e/  docs/   génération des types, validation Factur-X · test navigateur · RGPD
+```
+
+Règle : une page n'importe pas les fichiers internes d'une autre fonctionnalité sauf pour des composants volontairement partagés (ex. `features/quotes/SendQuoteDialog`). Les requêtes Supabase restent dans les pages ou dans `lib/` ; la logique critique (calculs, droits) est en base.
+
 ## Où est la logique métier
 
 Les règles critiques sont **en base**, pas dans le navigateur. Le front ne fait qu'appeler des fonctions :

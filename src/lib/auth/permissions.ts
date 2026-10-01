@@ -106,8 +106,6 @@ const PRESTATAIRE_PERMISSIONS: Permission[] = [
   "photos:write",
   "clients:read",
   "installations:read",
-  "documents:read",
-  "activities:read",
 ];
 
 const ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {

@@ -7,7 +7,7 @@ import { REQUEST_STATUS_LABELS } from "@/lib/quote-requests/status";
 import { DEMO_TODAY } from "@/lib/demo/fixtures";
 import { formatCurrency } from "@/lib/format";
 import { aggregateCommercialStats } from "@/lib/quotes/commercial-stats";
-import { CommercialPerformance } from "@/components/dashboard/CommercialPerformance";
+import { CommercialPerformance } from "@/features/dashboard/CommercialPerformance";
 import { InterventionBadge, InvoiceBadge, Kpi, PageTitle, QuoteBadge } from "@/demo/ui";
 
 export function DemoDashboardPage() {

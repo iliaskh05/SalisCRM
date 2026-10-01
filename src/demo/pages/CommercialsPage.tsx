@@ -1,6 +1,6 @@
 import { Trophy } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
-import { CommercialClosesView } from "@/components/commercials/CommercialClosesView";
+import { CommercialClosesView } from "@/features/commercials/CommercialClosesView";
 import { quoteTotals, useDemoStore } from "@/lib/demo/store";
 import { aggregateCommercialStats, isClosedQuote } from "@/lib/quotes/commercial-stats";
 import { PageTitle } from "@/demo/ui";
