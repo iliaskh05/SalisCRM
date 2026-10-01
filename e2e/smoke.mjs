@@ -2,7 +2,7 @@
 // Lancer : npm run test:e2e   (première fois : npx playwright install chromium)
 import { chromium } from "playwright";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, statSync } from "node:fs";
+import { mkdirSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -176,11 +176,14 @@ try {
     await page.getByText("F-2026-0001").first().waitFor({ timeout: 15000 });
     ok("fiche facture affichée", true);
     ok("bouton « Annuler par avoir » (direction)", await page.getByRole("button", { name: /Annuler par avoir/ }).isVisible());
-    const [download] = await Promise.all([page.waitForEvent("download", { timeout: 30000 }), page.getByRole("button", { name: "Facture PDF" }).click()]);
+    const [download] = await Promise.all([page.waitForEvent("download", { timeout: 30000 }), page.getByRole("button", { name: "Facture Factur-X" }).click()]);
     const path = `${SP}/shots/${download.suggestedFilename()}`;
     await download.saveAs(path);
     ok("PDF téléchargé sous le bon nom", download.suggestedFilename() === "Facture-F-2026-0001.pdf", download.suggestedFilename());
     ok("PDF non vide", statSync(path).size > 5000);
+    const bytes = readFileSync(path).toString("latin1");
+    ok("c’est un PDF/A-3 portant le XML Factur-X", bytes.startsWith("%PDF-") && bytes.includes("pdfaid:part>3<") && bytes.includes("factur-x.xml") && bytes.includes("/AFRelationship /Data"));
+    ok("polices intégrées (exigence PDF/A)", bytes.includes("/FontFile2") && !bytes.includes("/BaseFont /Helvetica"));
     await page.screenshot({ path: `${SP}/shots/facture.png` });
     ok("aucune erreur JS", errors.length === 0, errors.join(" | "));
     await page.context().close();

@@ -187,7 +187,7 @@ export function SettingsPage() {
           <BrandLogo size="md" />
           <p>Salis 3 Hottes · 12 rue de la Fontaine, 75011 Paris</p>
           <p>SIREN 848 392 017 · SIRET 848 392 017 00017 · TVA FR48 848392017</p>
-          <p>Facturation électronique : le format structuré (Factur-X) n’est pas encore produit et aucune plateforme agréée (PDP) n’est connectée.</p>
+          <p>Facturation électronique : les factures et avoirs se téléchargent au format Factur-X. Aucune plateforme agréée (PDP) n’est connectée : la transmission reste à votre charge.</p>
           <Link to="/produits" className="text-teal-700">Ouvrir le catalogue</Link>
         </CardContent>
       </Card>

@@ -6,7 +6,20 @@ import { companyBankDetails, round2, type BillingDocument } from "./document-mod
 /** Rendu A4 des devis, factures et avoirs (jsPDF). Chargé à la demande : voir download.ts. */
 
 export type PdfLogo = { dataUrl: string; aspect: number };
-export type RenderOptions = { logo?: PdfLogo | null; compress?: boolean };
+export type PdfFonts = { regular: ArrayBuffer; bold: ArrayBuffer };
+export type RenderOptions = {
+  logo?: PdfLogo | null;
+  compress?: boolean;
+  /** Polices TrueType à intégrer au fichier (requis pour le PDF/A-3 / Factur-X). Sans elles : Helvetica standard. */
+  fonts?: PdfFonts | null;
+};
+
+function toBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
+}
 
 const M = 15; // marge
 const PAGE_W = 210;
@@ -45,7 +58,20 @@ type AutoTableDoc = jsPDF & { lastAutoTable?: { finalY: number } };
 
 export async function renderDocumentPdf(source: BillingDocument, options: RenderOptions = {}): Promise<ArrayBuffer> {
   const [{ jsPDF: JsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
-  const doc: AutoTableDoc = new JsPDF({ unit: "mm", format: "a4", compress: options.compress ?? true });
+  const doc: AutoTableDoc = new JsPDF({
+    unit: "mm",
+    format: "a4",
+    compress: options.compress ?? true,
+    putOnlyUsedFonts: true, // PDF/A : aucune police standard non intégrée dans le fichier
+  });
+  let FONT = "helvetica";
+  if (options.fonts) {
+    doc.addFileToVFS("Roboto-Regular.ttf", toBase64(options.fonts.regular));
+    doc.addFileToVFS("Roboto-Bold.ttf", toBase64(options.fonts.bold));
+    doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
+    doc.addFont("Roboto-Bold.ttf", "Roboto", "bold");
+    FONT = "Roboto";
+  }
   const money = makeMoney(source.sign);
   const title = KIND_LABEL[source.kind];
 
@@ -76,12 +102,12 @@ export async function renderDocumentPdf(source: BillingDocument, options: Render
     doc.addImage(options.logo.dataUrl, "PNG", M, leftY, w, h);
     leftY += h + 3;
   } else {
-    doc.setFont("helvetica", "bold").setFontSize(15);
+    doc.setFont(FONT, "bold").setFontSize(15);
     color(INK);
     doc.text(COMPANY.legalName, M, leftY + 6);
     leftY += 10;
   }
-  doc.setFont("helvetica", "normal").setFontSize(8);
+  doc.setFont(FONT, "normal").setFontSize(8);
   color(MUTED);
   for (const line of [COMPANY.addressLine, `${COMPANY.postalCode} ${COMPANY.city}`, `${COMPANY.phone} · ${COMPANY.email}`]) {
     doc.text(line, M, leftY + 3);
@@ -89,13 +115,13 @@ export async function renderDocumentPdf(source: BillingDocument, options: Render
   }
 
   const rx = PAGE_W - M;
-  doc.setFont("helvetica", "bold").setFontSize(9);
+  doc.setFont(FONT, "bold").setFontSize(9);
   color(TEAL);
   doc.text(title.split("").join(" "), rx, 16, { align: "right" });
   doc.setFontSize(17);
   color(INK);
   doc.text(source.reference, rx, 24, { align: "right" });
-  doc.setFont("helvetica", "normal").setFontSize(8.5);
+  doc.setFont(FONT, "normal").setFontSize(8.5);
   color(MUTED);
   let ry = 30;
   const rightLine = (text: string) => {
@@ -113,13 +139,13 @@ export async function renderDocumentPdf(source: BillingDocument, options: Render
   // ---------- Émetteur / client ----------
   const half = CW / 2 - 4;
   const party = (x: number, heading: string, name: string, lines: string[]) => {
-    doc.setFont("helvetica", "bold").setFontSize(7);
+    doc.setFont(FONT, "bold").setFontSize(7);
     color(MUTED);
     doc.text(heading.toUpperCase(), x, y);
-    doc.setFont("helvetica", "bold").setFontSize(10);
+    doc.setFont(FONT, "bold").setFontSize(10);
     color(INK);
     doc.text(name, x, y + 5, { maxWidth: half });
-    doc.setFont("helvetica", "normal").setFontSize(8.5);
+    doc.setFont(FONT, "normal").setFontSize(8.5);
     color(MUTED);
     let ly = y + 9.5;
     for (const line of lines) {
@@ -151,7 +177,7 @@ export async function renderDocumentPdf(source: BillingDocument, options: Render
   y = Math.max(emitterEnd, clientEnd) + 2;
 
   const note = (text: string) => {
-    doc.setFont("helvetica", "normal").setFontSize(8.5);
+    doc.setFont(FONT, "normal").setFontSize(8.5);
     const wrapped = doc.splitTextToSize(text, CW - 8) as string[];
     const h = wrapped.length * 4 + 5;
     y = ensureSpace(y, h);
@@ -180,7 +206,7 @@ export async function renderDocumentPdf(source: BillingDocument, options: Render
     theme: "plain",
     head: [["Prestation", "Qté", "PU HT", "TVA", "Total HT"]],
     body: source.lines.map((l) => [l.label, plain(num.format(l.quantity)), money(l.unitPriceHt), `${plain(num.format(l.vatRate))} %`, money(l.lineTotalHt)]),
-    styles: { font: "helvetica", fontSize: 9, textColor: INK, cellPadding: PAD, overflow: "linebreak" },
+    styles: { font: FONT, fontSize: 9, textColor: INK, cellPadding: PAD, overflow: "linebreak" },
     headStyles: { fontSize: 7.5, fontStyle: "bold", textColor: MUTED, lineColor: RULE, lineWidth: { bottom: 0.3, top: 0.3, left: 0, right: 0 } },
     bodyStyles: { lineColor: RULE, lineWidth: { bottom: 0.15, top: 0, left: 0, right: 0 } },
     columnStyles: {
@@ -194,12 +220,12 @@ export async function renderDocumentPdf(source: BillingDocument, options: Render
       if (data.section === "head" && data.column.index > 0) data.cell.styles.halign = "right";
       if (data.section !== "body" || data.column.index !== 0) return;
       const line = source.lines[data.row.index];
-      doc.setFont("helvetica", "bold").setFontSize(9);
+      doc.setFont(FONT, "bold").setFontSize(9);
       const labelLines = doc.splitTextToSize(line.label, labelWidth - 2 * PAD) as string[];
       data.cell.text = labelLines;
       let height = 2 * PAD + labelLines.length * LABEL_LH;
       if (line.description?.trim()) {
-        doc.setFont("helvetica", "normal").setFontSize(8);
+        doc.setFont(FONT, "normal").setFontSize(8);
         const descLines = doc.splitTextToSize(line.description.trim(), labelWidth - 2 * PAD) as string[];
         descByRow.set(data.row.index, descLines);
         height += descLines.length * DESC_LH + 0.5;
@@ -211,7 +237,7 @@ export async function renderDocumentPdf(source: BillingDocument, options: Render
       const descLines = descByRow.get(data.row.index);
       if (!descLines) return;
       const labelLines = data.cell.text.length;
-      doc.setFont("helvetica", "normal").setFontSize(8);
+      doc.setFont(FONT, "normal").setFontSize(8);
       color(MUTED);
       doc.text(descLines, data.cell.x + PAD, data.cell.y + PAD + labelLines * LABEL_LH + 0.5, { baseline: "top" });
     },
@@ -241,7 +267,7 @@ export async function renderDocumentPdf(source: BillingDocument, options: Render
     theme: "plain",
     head: [["Taux TVA", "Base HT", "Montant TVA"]],
     body: source.vatRows.map((r) => [`${plain(num.format(r.rate))} %`, money(r.baseHt), money(r.vat)]),
-    styles: { font: "helvetica", fontSize: 8.5, textColor: INK, cellPadding: 1.6 },
+    styles: { font: FONT, fontSize: 8.5, textColor: INK, cellPadding: 1.6 },
     headStyles: { fontSize: 7.5, fontStyle: "bold", textColor: MUTED, lineColor: RULE, lineWidth: { bottom: 0.3, top: 0, left: 0, right: 0 } },
     bodyStyles: { lineColor: RULE, lineWidth: { bottom: 0.15, top: 0, left: 0, right: 0 } },
     columnStyles: { 0: { cellWidth: 26 }, 1: { halign: "right", cellWidth: 32 }, 2: { halign: "right", cellWidth: 32 } },
@@ -257,7 +283,7 @@ export async function renderDocumentPdf(source: BillingDocument, options: Render
   doc.roundedRect(boxX, blockTop, 82, boxH, 1.5, 1.5, "S");
   let ty = blockTop + 5.4;
   for (const [label, value, strong] of totalRows) {
-    doc.setFont("helvetica", strong ? "bold" : "normal").setFontSize(strong ? 10 : 8.5);
+    doc.setFont(FONT, strong ? "bold" : "normal").setFontSize(strong ? 10 : 8.5);
     color(strong ? INK : MUTED);
     doc.text(label, boxX + 4, ty);
     color(INK);
@@ -269,7 +295,7 @@ export async function renderDocumentPdf(source: BillingDocument, options: Render
   // ---------- Règlements reçus ----------
   if (source.kind === "invoice" && source.payments && source.payments.length > 0) {
     y = ensureSpace(y, 8 + source.payments.length * 6);
-    doc.setFont("helvetica", "bold").setFontSize(7.5);
+    doc.setFont(FONT, "bold").setFontSize(7.5);
     color(MUTED);
     doc.text("RÈGLEMENTS REÇUS", M, y);
     autoTable(doc, {
@@ -278,7 +304,7 @@ export async function renderDocumentPdf(source: BillingDocument, options: Render
       tableWidth: 110,
       theme: "plain",
       body: source.payments.map((p) => [formatDate(p.paidAt), METHOD_LABEL[p.method], p.reference ?? "", money(p.amount)]),
-      styles: { font: "helvetica", fontSize: 8.5, textColor: INK, cellPadding: 1.4 },
+      styles: { font: FONT, fontSize: 8.5, textColor: INK, cellPadding: 1.4 },
       bodyStyles: { lineColor: RULE, lineWidth: { bottom: 0.15, top: 0, left: 0, right: 0 } },
       columnStyles: { 0: { cellWidth: 24 }, 1: { cellWidth: 24 }, 2: { cellWidth: 34 }, 3: { halign: "right", cellWidth: 28 } },
     });
@@ -308,16 +334,16 @@ export async function renderDocumentPdf(source: BillingDocument, options: Render
   if (source.notes?.trim()) paragraphs.push({ heading: "Notes", text: source.notes.trim() });
 
   for (const p of paragraphs) {
-    doc.setFont("helvetica", "normal").setFontSize(8);
+    doc.setFont(FONT, "normal").setFontSize(8);
     const wrapped = doc.splitTextToSize(p.text, CW) as string[];
     y = ensureSpace(y, wrapped.length * 3.6 + (p.heading ? 5 : 0) + 2);
     if (p.heading) {
-      doc.setFont("helvetica", "bold").setFontSize(8);
+      doc.setFont(FONT, "bold").setFontSize(8);
       color(INK);
       doc.text(p.heading, M, y);
       y += 4;
     }
-    doc.setFont("helvetica", "normal").setFontSize(8);
+    doc.setFont(FONT, "normal").setFontSize(8);
     color(MUTED);
     doc.text(wrapped, M, y);
     y += wrapped.length * 3.6 + 2.5;
@@ -332,11 +358,11 @@ export async function renderDocumentPdf(source: BillingDocument, options: Render
     doc.roundedRect(M, y, boxW, 24, 1.5, 1.5, "S");
     doc.roundedRect(M + boxW + 6, y, boxW, 24, 1.5, 1.5, "S");
     doc.setLineDashPattern([], 0);
-    doc.setFont("helvetica", "bold").setFontSize(8.5);
+    doc.setFont(FONT, "bold").setFontSize(8.5);
     color(INK);
     doc.text("Bon pour accord — le client", M + 4, y + 6);
     doc.text(COMPANY.legalName, M + boxW + 10, y + 6);
-    doc.setFont("helvetica", "normal").setFontSize(7.5);
+    doc.setFont(FONT, "normal").setFontSize(7.5);
     color(MUTED);
     doc.text("Date, cachet et signature précédés de « Bon pour accord »", M + 4, y + 10.5);
     doc.text("Signature", M + boxW + 10, y + 10.5);
@@ -350,7 +376,7 @@ export async function renderDocumentPdf(source: BillingDocument, options: Render
       doc.saveGraphicsState();
       const GState = (doc as unknown as { GState: new (o: { opacity: number }) => unknown }).GState;
       doc.setGState(new GState({ opacity: 0.12 }) as never);
-      doc.setFont("helvetica", "bold").setFontSize(96);
+      doc.setFont(FONT, "bold").setFontSize(96);
       doc.setTextColor(220, 38, 38);
       doc.text(source.watermark, PAGE_W / 2, PAGE_H / 2 + 20, { align: "center", angle: 35 });
       doc.restoreGraphicsState();
@@ -358,7 +384,7 @@ export async function renderDocumentPdf(source: BillingDocument, options: Render
     doc.setDrawColor(...RULE);
     doc.setLineWidth(0.25);
     doc.line(M, FOOTER_TOP + 4, PAGE_W - M, FOOTER_TOP + 4);
-    doc.setFont("helvetica", "normal").setFontSize(7);
+    doc.setFont(FONT, "normal").setFontSize(7);
     color(MUTED);
     doc.text(
       `${COMPANY.legalName} — ${COMPANY.addressLine}, ${COMPANY.postalCode} ${COMPANY.city} — ${COMPANY.phone} — ${COMPANY.email}`,

@@ -41,6 +41,10 @@ export type BillingDocument = {
   validUntil?: string | null;
   /** « Facture liée : F-2026-0001 », « Devis d'origine : D-2026-0004 »… */
   relatedLine?: string | null;
+  /** Numéro de la facture annulée (avoir) : référence structurée du Factur-X */
+  precedingInvoice?: string | null;
+  /** Date d'émission de la facture annulée (obligatoire avec la référence, règle BR-FR-CO-05) */
+  precedingInvoiceDate?: string | null;
   client: DocumentClient;
   /** Lieu d'intervention (devis) */
   siteLine?: string | null;
@@ -223,6 +227,7 @@ export function creditNoteToDocument(input: {
   creditNote: Tables<"credit_notes">;
   client: ClientRow;
   invoiceNumber: string | null;
+  invoiceIssuedAt?: string | null;
 }): BillingDocument {
   const { creditNote } = input;
   const raw = Array.isArray(creditNote.lines) ? (creditNote.lines as unknown as RawLine[]) : [];
@@ -233,6 +238,8 @@ export function creditNoteToDocument(input: {
     reference: creditNote.number,
     issuedAt: creditNote.issued_at,
     relatedLine: `Annule la facture ${input.invoiceNumber ?? "—"} — motif : ${creditNote.reason}`,
+    precedingInvoice: input.invoiceNumber,
+    precedingInvoiceDate: input.invoiceIssuedAt,
     client: toClient(input.client),
     lines,
     totals,

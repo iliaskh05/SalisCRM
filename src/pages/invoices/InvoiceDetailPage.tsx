@@ -122,13 +122,13 @@ export function InvoiceDetailPage() {
           <div className="flex flex-wrap gap-2">
             <InvoiceStatusBadge status={balance?.status ?? invoice.status} />
             <DownloadPdfButton
-              label="Facture PDF"
+              label="Facture Factur-X"
               document={invoiceToDocument({ invoice, items, client, payments, quoteReference })}
             />
             {creditNote && (
               <DownloadPdfButton
-                label="Avoir PDF"
-                document={creditNoteToDocument({ creditNote, client, invoiceNumber: invoice.number })}
+                label="Avoir Factur-X"
+                document={creditNoteToDocument({ creditNote, client, invoiceNumber: invoice.number, invoiceIssuedAt: invoice.issued_at })}
               />
             )}
             <RoleGate permission="payments:write">
@@ -164,7 +164,8 @@ export function InvoiceDetailPage() {
       )}
 
       <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-        Facturation électronique : le PDF est généré, mais le format structuré (Factur-X) n’est <b>pas encore produit</b> et aucune plateforme agréée (PDP) n’est connectée. Cette facture n’a donc pas été transmise par voie électronique réglementaire.
+        Le fichier téléchargé est une facture <b>Factur-X</b> (PDF/A-3 contenant le XML EN 16931), contrôlée avec le validateur Mustang. Elle n’est
+        <b> pas transmise automatiquement</b> : aucune plateforme agréée (PDP) n’est connectée, c’est à vous de la déposer sur votre plateforme ou de l’envoyer au client.
       </div>
 
       <div className="mb-4 grid gap-3 sm:grid-cols-3">

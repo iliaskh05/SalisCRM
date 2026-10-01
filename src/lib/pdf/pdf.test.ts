@@ -102,6 +102,7 @@ test("avoir : montants en négatif, lignes reprises de la facture", () => {
     creditNote: { id: "cn", number: "AV-2026-0003", invoice_id: "i", client_id: "c", issued_at: "2026-10-05", reason: "Erreur de client", ...STORED, lines: ITEMS as never, created_by: null, created_at: "" },
     client: CLIENT,
     invoiceNumber: "F-2026-0017",
+    invoiceIssuedAt: "2026-09-30",
   });
   assert.equal(doc.sign, -1);
   assert.equal(doc.lines.length, 3);

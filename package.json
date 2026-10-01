@@ -10,11 +10,12 @@
     "lint": "tsc -b --pretty false",
     "typecheck": "tsc -b --pretty false",
     "test:db": "node supabase/tests/invoicing-integrity.test.mjs && node supabase/tests/security.test.mjs && node supabase/tests/operations.test.mjs && node supabase/tests/privacy.test.mjs",
-    "test:unit": "node --test src/lib/pdf/pdf.test.ts",
+    "test:unit": "node --test src/lib/pdf/pdf.test.ts scripts/facturx.test.mjs",
     "test:functions": "node --test supabase/tests/send-document-email.test.mjs",
     "types:gen": "node scripts/gen-types.mjs",
     "types:check": "node scripts/gen-types.mjs --check",
-    "test:e2e": "node e2e/smoke.mjs"
+    "test:e2e": "node e2e/smoke.mjs",
+    "test:facturx": "node scripts/facturx-validate.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -27,6 +28,7 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^0.575.0",
+    "pdf-lib": "^1.17.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.71.2",

@@ -37,9 +37,21 @@ Rôles :
 - **commercial** : clients, devis, factures, paiements, interventions.
 - **prestataire** : uniquement ses interventions (avancement, notes, photos, rapport). Aucune donnée financière : il lit la vue `provider_interventions` (sans prix HT) et avance ses interventions par `provider_update_intervention` ; il n'a aucun accès direct à la table `interventions`.
 
+## Factur-X (factures et avoirs)
+
+Les factures et les avoirs se téléchargent au format **Factur-X** : un PDF/A-3 lisible par un humain qui contient le XML structuré (syntaxe CII, profil **EN 16931**). Les devis restent des PDF classiques.
+
+**Validé, pas seulement généré** : `npm run test:facturx` (et la CI) soumettent des factures réalistes — remise sur deux taux de TVA, arrondis piégeux, TVA à 0 %, règlements partiels, avoir — au validateur open source **Mustang** (règles Schematron EN 16931, règles françaises BR-FR, et veraPDF pour le PDF/A-3B). Un fichier au total incohérent est bien rejeté. Le fichier réellement produit par le navigateur a aussi été validé.
+
+À savoir :
+- **Aucune plateforme agréée (PDP) n'est connectée.** Le fichier est conforme, mais sa transmission (dépôt sur la PDP de votre choix, ou envoi au client) reste à votre charge. La réforme française ajoute des mentions (catégorie d'opération, adresse de livraison…) qui dépendent de la plateforme retenue : **à valider avec elle** avant l'échéance qui vous concerne.
+- TVA à 0 % : traitée comme « exonérée » avec le motif générique « Exonération de TVA ». Si vous avez des cas particuliers (autoliquidation, export, article du CGI), le motif doit être précisé.
+- Quantités en « unité » (code C62), un seul pays (France), numéro de TVA du client non géré.
+- Les polices (Roboto, Apache 2.0) et le profil sRGB sont intégrés aux fichiers : voir `src/lib/pdf/assets/LICENSES.md`.
+
 ## Documents PDF
 
-Devis, factures et avoirs se téléchargent en PDF depuis leur fiche (boutons « PDF », « Facture PDF », « Avoir PDF »). Le PDF est généré dans le navigateur (`src/lib/pdf/`, bibliothèque chargée au premier clic) à partir des montants **enregistrés en base** : il n’y a aucun recalcul côté client.
+Devis, factures et avoirs se téléchargent en PDF depuis leur fiche (boutons « PDF », « Facture Factur-X », « Avoir Factur-X »). Le PDF est généré dans le navigateur (`src/lib/pdf/`, bibliothèque chargée au premier clic) à partir des montants **enregistrés en base** : il n’y a aucun recalcul côté client.
 
 Il contient les mentions obligatoires d’une facture (numéro, dates, identité des deux parties, ventilation HT/TVA par taux, pénalités de retard, indemnité de recouvrement de 40 €, escompte). Les coordonnées bancaires ne sont imprimées que si l’IBAN de `src/lib/company.ts` est valide.
 
@@ -147,7 +159,8 @@ Créer un projet Sentry (plateforme React) et renseigner `VITE_SENTRY_DSN`. Sans
 | `npm run build` | typecheck + build de production (`dist/`) |
 | `npm run typecheck` | vérification TypeScript |
 | `npm run test:db` | migrations + tests base de données |
-| `npm run test:unit` | tests unitaires (génération PDF, ventilation TVA) |
+| `npm run test:unit` | tests unitaires (génération PDF, Factur-X, ventilation TVA) |
+| `npm run test:facturx` | valide les Factur-X avec Mustang / veraPDF (Java requis ; télécharge Mustang une fois dans `.cache/`) |
 | `npm run test:functions` | tests des Edge Functions (envoi d'e-mail) |
 | `npm run test:e2e` | test navigateur (Chromium, faux serveur Supabase) ; 1re fois : `npx playwright install chromium` |
 | `npm run types:gen` | régénère `src/lib/supabase/database.generated.ts` depuis les migrations |

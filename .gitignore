@@ -30,3 +30,6 @@ pnpm-debug.log*
 # Supabase local
 supabase/.branches
 supabase/.temp
+
+# Caches locaux (validateur Factur-X)
+.cache/
